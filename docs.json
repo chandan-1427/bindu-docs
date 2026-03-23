@@ -115,6 +115,24 @@
             ]
           },
           {
+            "group": "gRPC & Language-Agnostic Agents",
+            "pages": [
+              "bindu/grpc/introduction",
+              "bindu/grpc/architecture",
+              "bindu/grpc/grpc-agent-client",
+              "bindu/grpc/api-reference",
+              {
+                "group": "SDKs",
+                "pages": [
+                  "bindu/grpc/sdks/getting-started",
+                  "bindu/grpc/sdks/typescript",
+                  "bindu/grpc/sdks/building-sdks"
+                ]
+              },
+              "bindu/grpc/limitations"
+            ]
+          },
+          {
             "group": "Learn",
             "pages": [
               {

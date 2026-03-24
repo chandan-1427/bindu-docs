@@ -1,0 +1,128 @@
+---
+title: "3.7 TypeScript OpenAI Agent"
+---
+
+TypeScript agent using OpenAI SDK with Bindu.
+
+## Code
+
+```typescript
+/**
+ * TypeScript OpenAI Agent — Bindufied
+ *
+ * Demonstrates using the Bindu TypeScript SDK with the OpenAI SDK.
+ * Uses GPT-4o to answer questions and assist users.
+ *
+ * Usage:
+ *   1. Set OPENAI_API_KEY in .env
+ *   2. npx tsx index.ts
+ */
+
+import { bindufy, ChatMessage } from "@bindu/sdk";
+import OpenAI from "openai";
+import * as dotenv from "dotenv";
+
+dotenv.config();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// bindufy — one call, full microservice
+bindufy(
+  {
+    author: "opnai-sample-ts@getbindu.com",
+    name: "openai-assistant-agent",
+    description:
+      "An assistant built with the OpenAI SDK and Bindu. Powered by GPT-4o.",
+    version: "1.0.0",
+    deployment: {
+      url: "http://localhost:3773",
+      expose: true,
+      cors_origins: ["http://localhost:5173"],
+    },
+    skills: ["skills/question-answering"],
+  },
+  async (messages: ChatMessage[]) => {
+    // Call OpenAI GPT-4o
+    const response = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o",
+      messages: messages.map((m) => ({
+        role: m.role as "user" | "assistant" | "system",
+        content: m.content,
+      })),
+    });
+
+    return response.choices[0].message.content || "";
+  }
+);
+```
+
+## How It Works
+
+**TypeScript SDK Integration**
+- `@bindu/sdk`: TypeScript Bindu SDK for agent development
+- Automatic microservice generation with DID and auth
+- gRPC communication with Bindu Python core
+- A2A protocol compliance handled by SDK
+
+**OpenAI SDK Integration**
+- `OpenAI`: Direct OpenAI SDK integration
+- GPT-4o model for question answering
+- Chat completions API with message history
+- Configurable model via environment variable
+
+**Message Processing**
+- `ChatMessage[]`: Bindu message format with role and content
+- Role mapping (user/assistant/system) for OpenAI compatibility
+- Direct API calls to OpenAI chat completions
+- Response extraction and content return
+
+**Configuration**
+- Environment-based API key management
+- Standard Bindu deployment configuration
+- Skills declaration for capabilities
+- Model configuration flexibility
+
+## Run
+
+```bash
+npx tsx index.ts
+```
+
+Try: "Explain the benefits of using TypeScript for backend development"
+
+Go to frontend and run npm run dev
+
+Open http://localhost:5173 and try to chat with the TypeScript OpenAI agent
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o
+```
+
+## Package Dependencies
+
+Install required packages:
+```bash
+npm install @bindu/sdk openai dotenv
+npm install -D @types/node tsx
+```
+
+## Build Configuration
+
+Add to `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  }
+}
+```

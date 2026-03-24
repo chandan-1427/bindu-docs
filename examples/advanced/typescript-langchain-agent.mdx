@@ -1,0 +1,141 @@
+---
+title: "3.6 TypeScript LangChain Agent"
+---
+
+TypeScript agent using LangChain.js with Bindu SDK.
+
+## Code
+
+```typescript
+/**
+ * TypeScript LangChain Agent — Bindufied
+ *
+ * Demonstrates using the Bindu TypeScript SDK with LangChain.js.
+ * The developer writes their agent using any TS framework — Bindu handles
+ * the conversion to a microservice with DID, auth, x402, and A2A protocol.
+ *
+ * Usage:
+ *   1. Set OPENAI_API_KEY in .env or environment
+ *   2. npx tsx index.ts
+ *
+ * The SDK will:
+ *   - Start the Bindu Python core in the background
+ *   - Register this agent with DID identity and A2A endpoints
+ *   - Listen for tasks via gRPC and execute them with LangChain
+ */
+
+import { bindufy, ChatMessage } from "@bindu/sdk";
+import { ChatOpenAI } from "@langchain/openai";
+import * as dotenv from "dotenv";
+
+dotenv.config();
+
+// Create LangChain agent — this is the developer's choice
+const llm = new ChatOpenAI({
+  model: "gpt-4o",
+  temperature: 0.7,
+});
+
+// bindufy — one call, full microservice
+bindufy(
+  {
+    author: "dev@example.com",
+    name: "langchain-research-agent",
+    description: "A research assistant built with LangChain.js and Bindu",
+    version: "1.0.0",
+    deployment: {
+      url: "http://localhost:3773",
+      expose: true,
+      cors_origins: ["http://localhost:5173"],
+    },
+    skills: ["skills/research"],
+    capabilities: {
+      streaming: false,
+      push_notifications: false,
+    },
+  },
+  async (messages: ChatMessage[]) => {
+    // Convert Bindu messages to LangChain format
+    const langchainMessages = messages.map((m) => ({
+      role: m.role as "user" | "assistant" | "system",
+      content: m.content,
+    }));
+
+    // Invoke LangChain
+    const response = await llm.invoke(langchainMessages);
+
+    // Return the content — Bindu handles the rest
+    return typeof response.content === "string"
+      ? response.content
+      : JSON.stringify(response.content);
+  }
+);
+```
+
+## How It Works
+
+**TypeScript SDK Integration**
+- `@bindu/sdk`: TypeScript Bindu SDK for agent development
+- Automatic microservice generation with DID and auth
+- gRPC communication with Bindu Python core
+- A2A protocol compliance handled by SDK
+
+**LangChain.js Integration**
+- `ChatOpenAI`: LangChain's OpenAI integration
+- Message format conversion between Bindu and LangChain
+- Async/await pattern for response handling
+- Flexible content type handling
+
+**Message Processing**
+- `ChatMessage[]`: Bindu message format with role and content
+- Role mapping (user/assistant/system) for LangChain compatibility
+- Content extraction and type checking
+- Response formatting for Bindu protocol
+
+**Configuration**
+- Environment-based API key management
+- Standard Bindu deployment configuration
+- Skills and capabilities declaration
+- CORS origins for frontend integration
+
+## Run
+
+```bash
+npx tsx index.ts
+```
+
+Try: "Research the latest developments in quantum computing and provide a summary"
+
+Go to frontend and run npm run dev
+
+Open http://localhost:5173 and try to chat with the TypeScript LangChain agent
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+## Package Dependencies
+
+Install required packages:
+```bash
+npm install @bindu/sdk @langchain/openai dotenv
+npm install -D @types/node tsx
+```
+
+## Build Configuration
+
+Add to `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  }
+}
+```

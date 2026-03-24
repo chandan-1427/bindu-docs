@@ -1,0 +1,108 @@
+---
+title: "1.8 Premium Research Assistant"
+---
+
+Simple research assistant that charges for usage.
+
+## Code
+
+```python
+"""Research Assistant Agent behind paywall
+
+A Bindu agent that finds and summarizes information.
+Uses DuckDuckGo for web search capabilities.
+
+Features:
+- Web search integration
+- Information summarization
+- Research assistance
+
+Usage:
+    python agno_paywall_example.py
+
+Environment:
+    Requires OPENROUTER_API_KEY in .env file
+"""
+
+import os
+from bindu.penguin.bindufy import bindufy
+from agno.agent import Agent
+from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.models.openrouter import OpenRouter
+from dotenv import load_dotenv
+
+load_dotenv()
+
+agent = Agent(
+    instructions="You are a research assistant that finds and summarizes information.",
+    model=OpenRouter(
+        id="openai/gpt-4o-mini",
+        api_key=os.getenv("OPENROUTER_API_KEY")
+    ),
+    tools=[DuckDuckGoTools()],
+)
+
+config = {
+    "author": "your.email@example.com",
+    "name": "research_agent",
+    "description": "A research assistant agent",
+    "deployment": {
+        "url": "http://localhost:3773",
+        "expose": True,
+        "cors_origins": ["http://localhost:5173"]
+    },
+    "skills": ["skills/question-answering", "skills/pdf-processing"],
+    "execution_cost": {
+        "amount": "$0.0001",
+        "token": "USDC",
+        "network": "base-sepolia",
+        "pay_to_address": "0x2654bb8B272f117c514aAc3d4032B1795366BA5d",
+        "protected_methods": [
+            "message/send"
+        ]
+    }
+}
+
+def handler(messages: list[dict[str, str]]):
+    result = agent.run(input=messages)
+    return result
+
+if __name__ == "__main__":
+    os.environ["AUTH_ENABLED"] = "false"
+    bindufy(config, handler)
+```
+
+## How It Works
+
+**Instructions**
+- Defines agent as research assistant
+- Finds and summarizes information from web
+- Provides comprehensive research results
+- Maintains informative and helpful tone
+
+**Tools**
+- `DuckDuckGoTools()`: Search web for current information
+- Web search integration for real-time data
+- Information gathering and summarization
+
+**Model**
+- `gpt-4o-mini`: Cost-effective model for research tasks
+- Via OpenRouter API integration
+- Configurable through environment variables
+
+**Payment**
+- `execution_cost`: $0.0001 USDC per request
+- `base-sepolia` network for transactions
+- Protected `message/send` method requires payment
+
+## Run
+
+```bash
+uv run examples/beginner/premium-research-assistant.py
+```
+
+Try: "Research the latest developments in quantum computing"
+
+Go to frontend and run npm run dev
+
+Open http://localhost:5173 and try to chat with the premium research assistant

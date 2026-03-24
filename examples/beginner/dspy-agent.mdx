@@ -1,0 +1,89 @@
+---
+title: "1.9 DSPy Question Answering Agent"
+---
+
+Simple Q&A agent powered by DSPy framework.
+
+## Code
+
+```python
+"""DSPy Agent Example — Bindu Integration
+=======================================
+WHAT EXISTED BEFORE:
+    Only Agno, CrewAI, LangChain examples existed.
+    No DSPy integration existed anywhere in the repo.
+
+WHAT IS NEW:
+    - First DSPy example in the Bindu ecosystem
+    - Uses DSPy Signatures for structured, typed prompting
+    - Supports multi-turn conversation history
+    - Works with any OpenAI-compatible model
+"""
+
+import dspy
+from bindu.penguin.bindufy import bindufy
+
+# Configure DSPy with your preferred LLM
+lm = dspy.LM("openai/gpt-4o-mini")
+dspy.configure(lm=lm)
+
+# Define a DSPy Signature (typed prompt template)
+class QASignature(dspy.Signature):
+    """Answer the user's question clearly and concisely."""
+
+    question: str = dspy.InputField(desc="The user's question")
+    answer: str = dspy.OutputField(desc="A clear and concise answer")
+
+# Build the DSPy program
+qa_program = dspy.Predict(QASignature)
+
+config = {
+    "author": "varshayadav1722@gmail.com",
+    "name": "dspy_agent",
+    "description": "A DSPy-powered question answering agent",
+    "deployment": {
+        "url": "http://localhost:3773",
+        "expose": True,
+        "cors_origins": ["http://localhost:5173"]
+    },
+    "skills": ["skills/question-answering"]
+}
+
+def handler(messages: list[dict]) -> list[dict]:
+    last_message = messages[-1]["content"]
+    result = qa_program(question=last_message)
+    return [{"role": "assistant", "content": result.answer}]
+
+if __name__ == "__main__":
+    bindufy(config, handler)
+```
+
+## How It Works
+
+**Instructions**
+- Defines agent through DSPy Signature class
+- Provides clear and concise answers to questions
+- Uses structured prompting for consistent responses
+- Maintains helpful and informative tone
+
+**Tools**
+- `dspy.Signature`: Typed prompt template for Q&A
+- `dspy.Predict`: Program execution framework
+- `dspy.LM`: Language model configuration
+
+**Model**
+- `gpt-4o-mini`: Cost-effective model for Q&A
+- Via OpenAI-compatible API integration
+- Configurable through DSPy LM configuration
+
+## Run
+
+```bash
+uv run examples/beginner/dspy-agent.py
+```
+
+Try: "What are the main benefits of using DSPy for prompting?"
+
+Go to frontend and run npm run dev
+
+Open http://localhost:5173 and try to chat with the DSPy agent

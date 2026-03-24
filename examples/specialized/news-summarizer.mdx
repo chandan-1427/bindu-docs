@@ -1,0 +1,135 @@
+---
+title: "2.7 News Summarizer"
+---
+
+AI agent that searches and summarizes latest news on any topic.
+
+## Code
+
+```python
+"""News Summarizer Agent
+
+A Bindu agent that searches and summarizes latest news on any topic.
+Runs locally via Ollama - no API key required!
+
+Features:
+- Real-time web search using DuckDuckGo
+- Local LLM via Ollama
+- Works for any topic: sports, tech, finance, politics etc..
+
+Usage:
+    python news_agent.py
+"""
+
+import os
+from dotenv import load_dotenv
+from agno.agent import Agent
+from agno.models.ollama import Ollama
+from agno.tools.duckduckgo import DuckDuckGoTools
+from bindu.penguin.bindufy import bindufy
+
+load_dotenv()
+
+# Agent Brain
+agent = Agent(
+    instructions=(
+        "You are a news research assistant. "
+        "When given a topic, search for the latest news about it. "
+        "Return a structured summary with: "
+        "1. Top 3 headlines "
+        "2. Brief summary of each "
+        "3. Overall sentiment (positive/negative/neutral)"
+    ),
+    model=Ollama(id="llama3.2"),
+    tools=[DuckDuckGoTools()],
+)
+
+# Bindu Config
+config = {
+    "author": "SSJ.shabdsnehi08@gmail.com",
+    "name": "news_summarizer_agent",
+    "description": "Searches and summarizes latest news on any topic using local Ollama",
+    "deployment": {
+        "url": "http://localhost:3773",
+        "expose": True,
+        "cors_origins": ["http://localhost:5173"]
+    },
+    "skills": [],
+}
+
+# Handler
+def handler(messages: list[dict[str, str]]):
+    """Process incoming messages and return news summary.
+
+    Args:
+        messages: Conversation history as list of dicts
+                  e.g. [{"role": "user", "content": "cricket news"}]
+
+    Returns:
+        Agent response with structured news summary
+    """
+    latest_message = messages[-1]["content"]
+    result = agent.run(input=messages)
+    return result
+
+# Launch
+if __name__ == "__main__":
+    os.environ["AUTH_ENABLED"] = "false"
+    bindufy(config, handler)
+```
+
+## How It Works
+
+**News Research**
+- `DuckDuckGoTools()`: Real-time web search for latest news
+- Searches for current events on any topic
+- Retrieves multiple news sources for comprehensive coverage
+
+**Local Processing**
+- `Ollama(id="llama3.2")`: Local LLM for private processing
+- No API keys required - runs completely locally
+- Cost-effective and privacy-preserving
+
+**Structured Output**
+- Top 3 headlines from search results
+- Brief summary of each news item
+- Overall sentiment analysis (positive/negative/neutral)
+
+**Agent Capabilities**
+- News research assistant persona
+- Multi-topic support (sports, tech, finance, politics)
+- Structured summary generation
+- Real-time information gathering
+
+## Run
+
+```bash
+uv run examples/specialized/news-summarizer.py
+```
+
+Try: "Summarize the latest news about artificial intelligence"
+
+Go to frontend and run npm run dev
+
+Open http://localhost:5173 and try to chat with the news summarizer
+
+## Local Setup
+
+Install Ollama and pull the model:
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull llama3.2 model
+ollama pull llama3.2
+
+# Start Ollama server
+ollama serve
+```
+
+## Dependencies
+
+Install required packages:
+```bash
+pip install agno bindu-penguin python-dotenv
+```

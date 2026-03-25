@@ -309,11 +309,11 @@
   },
   "fonts": {
     "heading": {
-      "family": "JetBrains Mono",
-      "weight": 750
+      "family": "Geist",
+      "weight": 600
     },
     "body": {
-      "family": "JetBrains Mono",
+      "family": "Geist",
       "weight": 400
     }
   },

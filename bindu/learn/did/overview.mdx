@@ -1,4 +1,5 @@
 ---
+
 title: "Decentralized Identifiers (DIDs)"
 description: "Secure, verifiable, and self-sovereign identity for AI agents"
 ---
@@ -40,13 +41,14 @@ Bindu uses **Decentralized Identifiers (DIDs)** to provide secure, verifiable, a
 
 ### The W3C Format
 
-Bindu DIDs follow the W3C standard structure:
+Bindu uses a readable DID structure:
 
 ```
 did:bindu:<email>:<agent_name>:<unique_hash>
 ```
 
-**Example:**
+Example:
+
 ```
 did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d
 ```
@@ -118,7 +120,7 @@ Think of it like this: `bindufy()` does the identity setup for you, so you do no
 
 ### Resolution Is Explicit
 
-Retrieve a DID document for an agent:
+You can retrieve an agent’s public identity (DID Document) using:
 
 ```bash
 curl -X POST http://localhost:3773/did/resolve \
@@ -136,20 +138,40 @@ The DID Document is the public record behind the identifier:
 
 ```json
 {
-    "@context": [
-        "https://www.w3.org/ns/did/v1",
-        "https://getbindu.com/ns/v1"
-    ],
-    "id": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d",
-    "created": "2026-02-11T05:33:56.969079+00:00",
-    "authentication": [
+  "id": "did:bindu:...",
+  "created": "2026-02-11T05:33:56.969079+00:00",
+  "authentication": [
+    {
+      "type": "Ed25519VerificationKey2020",
+      "publicKeyBase58": "<public-key>"
+    }
+  ]
+}
+```
+
+This document contains the public key used to verify the agent’s identity.
+
+---
+
+## Message Signing
+
+Agents sign responses with their private key. The signature is included in task response metadata:
+
+```json
+{
+  "artifacts": [
+    {
+      "parts": [
         {
-            "id": "did:bindu:...#key-1",
-            "type": "Ed25519VerificationKey2020",
-            "controller": "did:bindu:...",
-            "publicKeyBase58": "<base58-encoded-public-key>"
+          "kind": "text",
+          "text": "The capital of India is **New Delhi**.",
+          "metadata": {
+            "did.message.signature": "<base58-signature>"
+          }
         }
-    ]
+      ]
+    }
+  ]
 }
 ```
 
@@ -183,25 +205,9 @@ Bindu uses the `Ed25519VerificationKey2020` verification method. That gives agen
 
 Identity only matters if it holds up when a message is received, checked, and acted on.
 
-Agents sign responses with their private key. The signature is included in task response metadata:
+---
 
-```json
-{
-    "artifacts": [
-        {
-            "parts": [
-                {
-                    "kind": "text",
-                    "text": "The capital of India is **New Delhi**.",
-                    "metadata": {
-                        "did.message.signature": "<base58-signature>"
-                    }
-                }
-            ]
-        }
-    ]
-}
-```
+## Security Best Practices
 
 This signature proves:
 
@@ -241,5 +247,5 @@ This is the point of the whole model: trust becomes a verification step instead 
 
 ## Related
 
-- [Bindu Directory](https://bindus.directory)
-- [Atproto DID Specification](https://atproto.com/specs/did)
+* https://bindus.directory
+* https://atproto.com/specs/did

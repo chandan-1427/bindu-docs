@@ -1,138 +1,161 @@
 ---
-
 title: "Payment Integration (X402)"
 description: "Monetize AI agents with verifiable, on-chain payments"
 ---
 
-Bindu supports the **X402 payment protocol**, allowing you to require payments before executing specific agent methods.
+Free access works when every interaction is low-stakes. It breaks down when an agent delivers premium output, consumes paid infrastructure, or needs to enforce economic boundaries before work begins.
 
-In simple terms:
+## Why Payments Matter
 
-**Users pay → receive a payment token → use that token to access paid functionality.**
+In an open Agent-to-Agent network, payment cannot depend on manual invoicing, custom dashboards, or a centralized billing gate. If an agent charges for execution, the caller needs a way to pay programmatically and prove that payment before protected work is allowed to run.
 
-Bindu manages the full lifecycle: session creation, payment capture, on-chain verification, and access control.
+| Traditional Payment Rails | Bindu X402 Payments |
+| --- | --- |
+| Built for human checkout flows | Built for agent-to-agent and API-native flows |
+| Verification often depends on a provider webhook | Verification is tied to on-chain payment proof |
+| Hard to compose inside autonomous workflows | Designed to slot into agent execution paths |
+| Usually centered on accounts and dashboards | Centered on requests, sessions, and payment tokens |
+| Weak fit for crypto-native machine payments | Native fit for verifiable on-chain settlement |
 
----
+That is the shift: Bindu gives agents a programmatic payment layer that can create sessions, verify on-chain payment, and issue short-lived access tokens for protected methods.
 
-## Overview
+<Note>
+If an agent offers premium actions, the calling system should not have to rely on a human approval step or a private billing back office. It should be able to pay, prove payment, and continue automatically.
+</Note>
 
-### What is a Payment Token?
+## How Bindu Payments Work
 
-A **payment token** is a short-lived JWT issued after a successful payment.
+Bindu supports the **X402 payment protocol**, allowing you to require payment before executing specific agent methods. After a successful payment, Bindu issues a short-lived payment token that is used to access paid functionality.
 
-It represents proof that a user has paid and must be included in subsequent requests to access protected methods.
+### The Payment Model
 
----
+Bindu uses a straightforward payment lifecycle:
 
-### System Model
+```text
+payment session -> wallet payment -> on-chain verification -> payment token
+```
 
-Bindu’s payment system works as follows:
+Example flow:
 
-1. A payment session is created
-2. The user completes payment via their wallet
-3. The transaction is confirmed on-chain
-4. Bindu verifies the transaction
-5. A payment token is issued
-6. The token is used to access protected methods
+```text
+user request -> paid method -> session created -> payment completed -> token issued
+```
 
----
+The model is easy for developers to reason about and strict enough for production controls:
 
-## Why X402?
+- A **payment session** defines what must be paid
+- A **wallet transaction** settles the payment on-chain
+- A **verification step** confirms the transaction details
+- A **payment token** proves access for the protected method
 
-Traditional payment systems are not designed for autonomous agents.
+<CardGroup cols={3}>
+  <Card title="Programmatic" icon="robot">
+    Payments can be initiated and completed as part of automated agent workflows.
+  </Card>
+  <Card title="Verifiable" icon="shield-check">
+    Bindu checks blockchain data before issuing access to protected methods.
+  </Card>
+  <Card title="Scoped" icon="key">
+    Payment tokens are short-lived, task-specific, and bound to the paid access path.
+  </Card>
+</CardGroup>
 
-X402 enables:
+### The Lifecycle: Session, Verification, Access
 
-* Direct payments without intermediaries
-* On-chain verification of transactions
-* Native integration with agent workflows
-* No reliance on centralized payment providers
-
-### When to Use X402
-
-Use X402 when:
-
-* You need agent-to-agent or programmatic payments
-* You want verifiable, trustless transactions
-* You are building crypto-native applications
-
-Use traditional systems when:
-
-* You require fiat payments
-* You need subscriptions or recurring billing
-* You rely on centralized payment infrastructure
-
----
-
-## How It Works
+Under the hood, every paid Bindu interaction moves through three practical stages.
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Agent
-    participant Blockchain
     participant Wallet
+    participant Blockchain
 
-    Note over User,Agent: 1. Start Payment Session
-    User->>Agent: POST /api/start-payment-session
-    Agent-->>User: {session_id, browser_url}
+    Note over User,Agent: 1. Session
+    User->>Agent: Request protected method
+    Agent-->>User: Payment session + browser_url
 
-    Note over User,Wallet: 2. Complete Payment
-    User->>Agent: Open browser_url
-    User->>Wallet: Connect wallet
+    Note over User,Blockchain: 2. Verification
     User->>Wallet: Approve transaction
-    Wallet->>Blockchain: Submit transaction
-    Blockchain-->>Wallet: Confirmed
+    Wallet->>Blockchain: Submit payment
+    Blockchain-->>Agent: Transaction confirmation
 
-    Note over User,Agent: 3. Verify Payment
-    Wallet->>Agent: Send payment proof
-    Agent->>Blockchain: Verify transaction
+    Note over User,Agent: 3. Access
     Agent-->>User: payment_token
-
-    Note over User,Agent: 4. Access Method
-    User->>Agent: Request with X-Payment-Token
-    Agent-->>User: Response
+    User->>Agent: Call protected method with token
+    Agent-->>User: Paid response
 ```
 
+<Steps>
+  <Step title="Session">
+    Bindu creates a payment session whenever a caller attempts to access a protected method. The session captures the amount, token, network, and recipient wallet.
+
+    ```python
+    config = {
+        "author": "your.email@example.com",
+        "name": "paid_agent",
+        "description": "An agent that requires payment",
+        "deployment": {"url": "http://localhost:3773", "expose": True},
+        "execution_cost": {
+            "amount": "$0.0001",
+            "token": "USDC",
+            "network": "base-sepolia",
+            "pay_to_address": "0xYourWalletAddressHere",
+            "protected_methods": ["message/send"]
+        }
+    }
+    ```
+
+    Think of it like this: the config defines the economic gate, and Bindu turns that policy into a concrete payment session at runtime.
+  </Step>
+
+  <Step title="Verification">
+    The user completes payment in their wallet. Bindu then validates the transaction on-chain by checking the sender, recipient, amount, and network before it grants access.
+
+    <CodeGroup>
+      ```bash Request
+      curl http://localhost:3773/api/payment-status/<session_id>
+      ```
+
+      ```json Response
+      {
+        "status": "completed",
+        "payment_token": "<token>"
+      }
+      ```
+    </CodeGroup>
+
+    Only verified transactions result in token issuance.
+  </Step>
+
+  <Step title="Access">
+    Once payment is verified, the caller uses the returned payment token to access the protected method.
+
+    <CodeGroup>
+      ```bash Protected Request
+      curl http://localhost:3773/ \
+        -H "X-Payment-Token: <token>" \
+        -d '{ "method": "message/send" }'
+      ```
+
+      ```json Protected Response
+      {
+        "result": "Paid method executed successfully"
+      }
+      ```
+    </CodeGroup>
+
+    The token is short-lived and scoped to the paid interaction rather than acting like a reusable long-term credential.
+  </Step>
+</Steps>
+
 ---
 
-## Quick Start
+## Payment Configuration
 
-1. Add `execution_cost` to your agent config
-2. Start your agent
-3. Call a protected method
-4. Complete payment in browser
-5. Use the returned payment token
+Bindu lets you define either a single payment path or multiple acceptable payment options depending on how flexible you want the checkout experience to be.
 
-You now have a paid agent.
-
----
-
-## Setup (Testing)
-
-If you're new to crypto, follow this section. Otherwise, skip to configuration.
-
-### 1. Create a Wallet
-
-* MetaMask (recommended)
-* Coinbase Wallet
-
-### 2. Get Test Funds
-
-* Get Base Sepolia ETH (for gas)
-* Obtain test USDC
-
-### 3. Set Your Wallet Address
-
-```python
-"pay_to_address": "0xYourWalletAddressHere"
-```
-
----
-
-## Configuration
-
-### Single Payment Option
+### Single Option
 
 ```python
 config = {
@@ -150,9 +173,7 @@ config = {
 }
 ```
 
----
-
-### Multiple Payment Options
+### Multiple Options
 
 You can provide multiple payment options. Any one of them satisfies access.
 
@@ -175,140 +196,102 @@ config = {
 }
 ```
 
----
+Each model serves a different need:
 
-## Payment Flow (Detailed)
+- Use a **single option** when the payment path should be predictable and simple
+- Use **multiple options** when callers may pay with different assets or networks
+- Protect only the methods that actually require monetization through `protected_methods`
 
-### 1. Start Payment Session
+<Note>
+If you are testing for the first time, start on `base-sepolia`, fund a wallet with test assets, and set `pay_to_address` explicitly before exposing paid methods.
+</Note>
 
-```bash
-curl -X POST http://localhost:3773/api/start-payment-session \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>"
-```
+### Standards
 
----
+<CardGroup cols={3}>
+  <Card title="X402 Protocol" icon="credit-card" href="https://github.com/coinbase/x402">
+    The payment protocol Bindu uses to structure monetized API and agent flows.
+  </Card>
+  <Card title="Base Network Info" icon="globe" href="https://docs.base.org/network-information">
+    Network details for configuring supported chains such as Base and Base Sepolia.
+  </Card>
+  <Card title="JWT Access Tokens" icon="key-round" href="https://jwt.io/introduction">
+    Short-lived payment tokens give callers scoped proof of successful payment.
+  </Card>
+</CardGroup>
 
-### 2. Complete Payment
+## The Value of Verifiable Payments
 
-* Open `browser_url`
-* Connect wallet
-* Approve transaction
-* Wait for blockchain confirmation
+Payments only matter if they hold up when a request is challenged, replayed, or audited.
 
----
+This model gives you:
 
-### 3. Verify Payment
+- **Access control** - Protected methods only run after verified payment
+- **Integrity** - The payment is checked against blockchain data before access is granted
+- **Composability** - Agents can include payment directly inside autonomous workflows
 
-```bash
-curl http://localhost:3773/api/payment-status/<session_id>
-```
+This is the point of the whole model: monetization becomes part of protocol behavior instead of a disconnected billing system.
 
-Response:
+## Real-World Use Cases
 
-```json
-{
-  "status": "completed",
-  "payment_token": "<token>"
-}
-```
+<AccordionGroup>
+  <Accordion title="Premium research or inference endpoints">
+    If an agent performs expensive inference, premium research, or API-backed work, payment can be required before execution so infrastructure cost is enforced at the request boundary.
 
----
+    ```python
+    def require_payment_before_inference(session_status):
+        if session_status["status"] != "completed":
+            raise PermissionError("Payment required before premium inference.")
+        return "Inference can proceed"
+    ```
+  </Accordion>
 
-### 4. Call Protected Method
+  <Accordion title="Agent-to-agent paid task execution">
+    One agent can pay another for specialized work, then pass the payment token with the protected call to complete the transaction programmatically.
 
-```bash
-curl http://localhost:3773/ \
-  -H "X-Payment-Token: <token>" \
-  -d '{ "method": "message/send" }'
-```
+    ```python
+    async def call_paid_agent(payment_token, payload):
+        headers = {"X-Payment-Token": payment_token}
+        return await httpx.post("http://localhost:3773/", headers=headers, json=payload)
+    ```
+  </Accordion>
 
----
+  <Accordion title="Micropayments for metered APIs">
+    Small, per-task payments work well for lightweight operations such as summarization, classification, scraping, or data transformation where subscriptions would add unnecessary friction.
 
-## Payment Behavior
+    ```python
+    config = {
+        "execution_cost": {
+            "amount": "$0.0001",
+            "token": "USDC",
+            "network": "base-sepolia",
+            "pay_to_address": "0xYourWalletAddressHere",
+            "protected_methods": ["message/send"]
+        }
+    }
+    ```
+  </Accordion>
 
-* Each task requires a new payment
-* Tokens are task-specific and non-reusable
-* `input_required` steps do not require payment
-* Tokens expire after a short duration
+  <Accordion title="Crypto-native developer products">
+    If your product already lives in an on-chain environment, X402 lets your payment logic stay aligned with the rest of the system instead of bridging through a separate billing stack.
 
----
+    ```python
+    def verify_paid_access(session):
+        return session.get("status") == "completed" and "payment_token" in session
+    ```
+  </Accordion>
+</AccordionGroup>
 
-## Trust & Verification
+## Security Best Practices
 
-Bindu verifies payments using blockchain data:
-
-* Validates transaction signature
-* Confirms sender and recipient addresses
-* Checks payment amount
-* Ensures transaction exists on-chain
-
-Only verified transactions result in token issuance.
-
----
-
-## Security Model
-
-* Payment tokens are bound to sessions
-* Tokens are short-lived and expire automatically
-* Tokens cannot be reused across tasks
-* Duplicate or replay usage is prevented via session tracking
-
----
-
-## UI Integration
-
-Bindu provides a built-in payment UI via `browser_url`.
-
-Typical frontend flow:
-
-1. Start payment session
-2. Redirect user to payment UI
-3. Wait for completion
-4. Retrieve `payment_token`
-5. Attach token to API requests
-
----
-
-## Common Issues
-
-* Session expired → start a new session
-* Payment pending → wait for confirmation
-* Invalid token → ensure correct session
-* Wrong network → switch wallet network
-
----
-
-## Production Deployment
-
-1. Switch to mainnet:
-
-```python
-"network": "base"
-```
-
-2. Use real USDC
-3. Set production wallet address
-4. Monitor incoming payments
-5. Adjust pricing
-
----
-
-## Tips
-
-* Start with small amounts
-* Clearly communicate pricing
-* Handle failures gracefully
-* Clean expired sessions
-* Optimize user experience
-
----
-
-## Example
-
-```
-examples/beginner/echo_agent_behind_paywall.py
-```
+<CardGroup cols={2}>
+  <Card title="Keep Prices Explicit" icon="coins">
+    Clearly define amount, token, network, and protected methods so callers know exactly what they are paying for.
+  </Card>
+  <Card title="Scope Tokens Tightly" icon="lock">
+    Use short-lived, task-specific payment tokens and avoid treating them like reusable API credentials.
+  </Card>
+</CardGroup>
 
 ---
 
@@ -316,4 +299,23 @@ examples/beginner/echo_agent_behind_paywall.py
 
 * https://github.com/coinbase/x402
 * https://docs.base.org/network-information
-* ./AUTHENTICATION.md
+* /bindu/learn/did/overview
+
+---
+
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+
+  <span className="brand-quote-text">
+    Bindu allows agents to bloom independently{" "}
+    <span className="brand-quote-highlight">
+      turning trust into verifiable value
+    </span>
+    , and bringing light to the Internet of Agents.
+  </span>
+</span>

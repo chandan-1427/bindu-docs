@@ -6,6 +6,8 @@ Data analysis agent that processes CSV files and generates visualizations.
 
 ## Code
 
+Create `ai-data-analysis-agent.py` with the code below, or save it directly from your editor.
+
 ```python
 import os
 import traceback
@@ -145,6 +147,59 @@ if __name__ == "__main__":
     bindufy(config=config, handler=handler)
 ```
 
+## Skill Configuration
+
+Create `skills/ai-data-analysis-agent/skill.yaml`:
+
+```yaml
+id: data-analysis-skill
+name: data-analysis-skill
+version: 1.0.0
+author: your.email@example.com
+description: |
+  Advanced data science skill that provides comprehensive dataset analysis,
+  statistical summaries, and autonomous visual chart generation.
+
+  Features:
+  - CSV parsing and structural analysis
+  - Statistical summaries (mean, median, standard deviation)
+  - Missing value detection and data type inference
+  - Autonomous data visualization (Bar, Line, and Scatter charts)
+  - Markdown-formatted analytical reporting
+
+  Uses Pandas for heavy data manipulation and a thread-safe
+  Matplotlib/Seaborn backend (Agg) for background image generation.
+tags:
+  - data-science
+  - analytics
+  - visualization
+  - pandas
+  - csv
+  - statistics
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "Please analyze the dataset located at sample_sales.csv"
+  - "Give me a brief summary of the data, and generate a bar chart showing Sales by Product"
+  - "Are there any missing values in this dataset?"
+  - "Create a scatter plot comparing Revenue and Marketing Spend"
+capabilities_detail:
+  dataset_parsing:
+    supported: true
+    description: "Ability to ingest and read CSV file structures"
+  statistical_analysis:
+    supported: true
+    description: "Computes core statistics and identifies data anomalies/nulls"
+  data_visualization:
+    supported: true
+    description: "Generates custom PNG charts based on user prompts and data trends"
+  markdown_reporting:
+    supported: true
+    description: "Synthesizes data findings into highly readable Markdown reports"
+```
+
 ## How It Works
 
 **Data Processing**
@@ -169,14 +224,92 @@ if __name__ == "__main__":
 - File path validation and existence checks
 - Graceful failure recovery with user feedback
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu agno python-dotenv pandas matplotlib seaborn
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
 ## Run
 
 ```bash
-uv run examples/specialized/ai-data-analysis-agent.py
+uv run ai-data-analysis-agent.py
 ```
 
-Try: "Analyze the dataset at /path/to/your/data.csv and create a bar chart showing sales by region"
+**Examples:**
 
-Go to frontend and run npm run dev
+- "Analyze the dataset at /path/to/your/data.csv and create a bar chart showing sales by region"
+- "Give me a brief summary of data, and generate a bar chart showing Sales by Product"
+- "Are there any missing values in this dataset?"
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Analyze the dataset at /path/to/your/data.csv and create a bar chart showing sales by region"
+        }
+      ]
+    },
+     "skillId": "data-analysis-skill",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
 
 Open http://localhost:5173 and try to chat with the AI data analysis agent

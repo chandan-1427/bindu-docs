@@ -34,7 +34,6 @@ config = {
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },
-    "skills": ["skills/question-answering", "skills/pdf-processing"],
 }
 
 def handler(messages):
@@ -62,16 +61,91 @@ bindufy(config, handler)
 - Requires `OPENROUTER_API_KEY` in `.env`
 - `load_dotenv()` loads environment variables
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu agno python-dotenv
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
 ## Run
 
 ```bash
-# Create .env file
-echo "OPENROUTER_API_KEY=your-key-here" > examples/beginner/.env
-
-# Run agent
-uv run examples/beginner/beginner_zero_config_agent.py
+uv run beginner_zero_config_agent.py
 ```
 
-Go to frontend and run npm run dev
+## Examples
 
-Open http://localhost:5173 and try to chat with echo agent
+- "Tell me about artificial intelligence"
+- "What are the main features of large language models?"
+- "Explain machine learning in simple terms"
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Tell me about artificial intelligence"
+        }
+      ]
+    },
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with zero config agent

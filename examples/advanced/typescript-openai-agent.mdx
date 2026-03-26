@@ -41,7 +41,7 @@ bindufy(
       expose: true,
       cors_origins: ["http://localhost:5173"],
     },
-    skills: ["skills/question-answering"],
+    skills: ["skills/typescript-openai-skill"],
   },
   async (messages: ChatMessage[]) => {
     // Call OpenAI GPT-4o
@@ -56,6 +56,133 @@ bindufy(
     return response.choices[0].message.content || "";
   }
 );
+```
+## Skill Configuration
+
+Create `skills/typescript-openai-skill/skill.yaml`:
+
+```yaml
+# TypeScript OpenAI Agent Skill
+# TypeScript-based AI agent using OpenAI SDK
+
+id: typescript-openai-skill
+name: TypeScript OpenAI Agent Skill
+version: 1.0.0
+author: typescript-developer@example.com
+
+description: |
+  TypeScript agent that demonstrates Bindu SDK integration with OpenAI SDK.
+  Built with modern TypeScript practices and direct OpenAI API integration.
+
+  Features:
+  - Direct OpenAI SDK integration
+  - TypeScript type safety and modern ES features
+  - GPT-4o model support
+  - Environment-based configuration
+  - CORS-enabled for frontend integration
+
+tags:
+  - typescript
+  - openai
+  - gpt-4o
+  - bindu-sdk
+  - agent-development
+  - es2022
+  - nodejs
+
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+
+examples:
+  - "What are the key features of GPT-4o for TypeScript development?"
+  - "How do I implement error handling in OpenAI API calls?"
+  - "Create a TypeScript function that analyzes sentiment using OpenAI"
+  - "What are the best practices for TypeScript OpenAI integration?"
+  - "How do I optimize OpenAI API responses in TypeScript?"
+
+capabilities_detail:
+  openai_integration:
+    supported: true
+    description: "Direct integration with OpenAI SDK"
+    features:
+      - gpt_4o_support
+      - chat_completions
+      - error_handling
+
+  typescript_support:
+    supported: true
+    description: "Full TypeScript support with type safety"
+    features:
+      - es2022_target
+      - strict_typing
+      - modern_syntax
+
+  bindu_sdk:
+    supported: true
+    description: "Full Bindu SDK integration for protocol compliance"
+    features:
+      - did_support
+      - x402_payments
+      - a2a_protocol
+      - cors_enabled
+
+requirements:
+  packages:
+    - "@bindu/sdk"
+    - "openai"
+    - "dotenv"
+    - "@types/node"
+    - "tsx"
+  system:
+    - node_18_or_higher
+    - typescript_5_or_higher
+  api_keys:
+    - OPENAI_API_KEY
+
+performance:
+  avg_response_time_ms: 2500
+  max_concurrent_requests: 8
+  memory_usage_mb: 256
+  scalability: vertical
+
+assessment:
+  keywords:
+    - typescript
+    - openai
+    - gpt-4o
+    - agent
+    - bindu
+    - nodejs
+    - es2022
+
+  specializations:
+    - domain: typescript-development
+      confidence_boost: 0.4
+    - domain: openai-integration
+      confidence_boost: 0.6
+    - domain: api-development
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "blocking operations"
+    - "callback hell"
+    - "type_any_usage"
+    - "legacy_syntax"
+
+  complexity_indicators:
+    simple:
+      - "what are"
+      - "how do I"
+      - "explain"
+    medium:
+      - "implement"
+      - "best practices for"
+    complex:
+      - "create function that"
+      - "optimize responses"
+      - "comprehensive guide"
 ```
 
 ## How It Works
@@ -84,18 +211,12 @@ bindufy(
 - Skills declaration for capabilities
 - Model configuration flexibility
 
-## Run
+## Dependencies
 
 ```bash
-npx tsx index.ts
+npm install @bindu/sdk openai dotenv
+npm install -D @types/node tsx
 ```
-
-Try: "Explain the benefits of using TypeScript for backend development"
-
-Go to frontend and run npm run dev
-
-Open http://localhost:5173 and try to chat with the TypeScript OpenAI agent
-
 ## Environment Setup
 
 Create `.env` file:
@@ -104,25 +225,72 @@ OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o
 ```
 
-## Package Dependencies
+## Run
 
-Install required packages:
 ```bash
-npm install @bindu/sdk openai dotenv
-npm install -D @types/node tsx
+npx tsx index.ts
 ```
+## Example API Calls
 
-## Build Configuration
-
-Add to `tsconfig.json`:
+<AccordionGroup>
+  <Accordion title="Message Send Request">
 ```json
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
-  }
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "What are the key features of GPT-4o for TypeScript development?"
+        }
+      ]
+    },
+     "skillId": "typescript-openai-skill",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
 }
 ```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the TypeScript OpenAI agent
+

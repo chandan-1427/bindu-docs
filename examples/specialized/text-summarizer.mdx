@@ -6,6 +6,8 @@ Creates concise summaries of any input text.
 
 ## Code
 
+Create `text-summarizer.py` with the code below, or save it directly from your editor.
+
 ```python
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
@@ -46,6 +48,78 @@ bindufy(config, handler)
 # This will create a tunnel to your agent and expose it on port 3773
 ```
 
+## Skill Configuration
+
+Create `skills/text-summarization-skill/skill.yaml`:
+
+```yaml
+# Text Summarization Skill
+# Advanced text summarization with intelligent content condensation
+
+id: text-summarization-skill
+name: Text Summarization Skill
+version: 1.0.0
+author: gaurikasethi88@gmail.com
+
+description: |
+  Advanced text summarization agent that creates concise, coherent summaries
+  of any input text while preserving key information and context.
+
+  Features:
+  - Intelligent content condensation
+  - Key point extraction and preservation
+  - Context-aware summarization
+  - Coherent narrative flow
+  - Multi-format text support
+  - Rapid processing with OpenRouter integration
+
+  Capabilities:
+  - Long-form text summarization
+  - Article and document condensation
+  - Key point extraction
+  - Context preservation
+  - Coherent summary generation
+
+  Uses OpenRouter's `openai/gpt-oss-120b` model for high-quality
+  summarization with excellent comprehension and generation capabilities.
+
+  Perfect for quickly understanding lengthy documents, articles,
+  reports, or any text content that needs to be condensed efficiently.
+tags:
+  - summarization
+  - text-processing
+  - content-condensation
+  - information-extraction
+  - document-analysis
+  - reading-assistance
+  - productivity
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "Summarize this article about climate change"
+  - "Create a summary of the quarterly report"
+  - "Condense this research paper into key points"
+  - "Summarize the meeting transcript"
+  - "Extract main points from this email thread"
+capabilities_detail:
+  text_summarization:
+    supported: true
+    description: "Creates concise 2-3 sentence summaries of any input text"
+  key_point_extraction:
+    supported: true
+    description: "Identifies and preserves the most important information"
+  context_preservation:
+    supported: true
+    description: "Maintains context and coherence in summaries"
+  multi_format_support:
+    supported: true
+    description: "Handles various text formats and structures"
+  rapid_processing:
+    supported: true
+    description: "Fast summarization using OpenRouter's efficient model"
+```
 ## How It Works
 
 **Summarization Instructions**
@@ -67,18 +141,88 @@ bindufy(config, handler)
 - `text-summarization-skill`: Defines summarization capabilities
 - Enables skill-based discovery
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu agno python-dotenv
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
 ## Run
 
 ```bash
-# Set API key
-echo "OPENROUTER_API_KEY=your-key-here" > examples/summarizer/.env
-
-# Run agent
-uv run examples/summarizer/summarizer_agent.py
+uv run text-summarizer.py
 ```
 
-Try: "Climate change refers to long-term shifts in global temperatures and weather patterns. While climate variations are natural, human activities have been the main driver of climate change since the mid-20th century, primarily due to fossil fuel burning."
+Try: "Summarize this text about climate change and its effects on the environment"
 
-Go to frontend and run npm run dev
+## Example API Calls
 
-Open http://localhost:5173 and try to chat with summarizer agent
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Summarize this text about climate change and its effects on the environment"
+        }
+      ]
+    },
+     "skillId": "text-summarization-skill",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the text summarizer

@@ -48,7 +48,7 @@ bindufy(
       expose: true,
       cors_origins: ["http://localhost:5173"],
     },
-    skills: ["skills/research"],
+    skills: ["skills/typescript-langchain-skill"],
     capabilities: {
       streaming: false,
       push_notifications: false,
@@ -71,6 +71,139 @@ bindufy(
   }
 );
 ```
+## Skill Configuration
+
+Create `skills/typescript-langchain-skill/skill.yaml`:
+
+```yaml
+# TypeScript LangChain Agent Skill
+# TypeScript-based AI agent using LangChain.js framework
+
+id: typescript-langchain-skill
+name: TypeScript LangChain Agent Skill
+version: 1.0.0
+author: typescript-developer@example.com
+
+description: |
+  TypeScript agent that demonstrates Bindu SDK integration with LangChain.js.
+  Built with modern TypeScript practices and LangChain framework for AI agent development.
+
+  Features:
+  - Direct LangChain.js integration
+  - TypeScript type safety and modern ES features
+  - OpenAI API integration through LangChain
+  - Environment-based configuration
+  - CORS-enabled for frontend integration
+
+tags:
+  - typescript
+  - langchain
+  - openai
+  - bindu-sdk
+  - agent-development
+  - es2022
+  - nodejs
+
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+
+examples:
+  - "Research the latest developments in quantum computing and provide a summary"
+  - "What are the main benefits of using LangChain with TypeScript?"
+  - "How do I integrate LangChain with OpenAI in a TypeScript application?"
+  - "Create a TypeScript agent that can analyze documents"
+  - "What are the best practices for TypeScript agent development?"
+
+capabilities_detail:
+  langchain_integration:
+    supported: true
+    description: "Direct integration with LangChain.js framework"
+    features:
+      - chain_composition
+      - memory_management
+      - prompt_templates
+
+  typescript_support:
+    supported: true
+    description: "Full TypeScript support with type safety"
+    features:
+      - es2022_target
+      - strict_typing
+      - modern_syntax
+
+  openai_backend:
+    supported: true
+    description: "OpenAI API integration through LangChain"
+    models_supported: ["gpt-4o", "gpt-4o-mini"]
+
+  bindu_sdk:
+    supported: true
+    description: "Full Bindu SDK integration for protocol compliance"
+    features:
+      - did_support
+      - x402_payments
+      - a2a_protocol
+      - cors_enabled
+
+requirements:
+  packages:
+    - "@bindu/sdk"
+    - "@langchain/openai"
+    - "dotenv"
+    - "@types/node"
+    - "tsx"
+  system:
+    - node_18_or_higher
+    - typescript_5_or_higher
+  api_keys:
+    - OPENAI_API_KEY
+
+performance:
+  avg_response_time_ms: 3000
+  max_concurrent_requests: 5
+  memory_usage_mb: 256
+  scalability: vertical
+
+assessment:
+  keywords:
+    - typescript
+    - langchain
+    - openai
+    - agent
+    - bindu
+    - nodejs
+    - es2022
+
+  specializations:
+    - domain: typescript-development
+      confidence_boost: 0.4
+    - domain: langchain-integration
+      confidence_boost: 0.5
+    - domain: openai-integration
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "blocking operations"
+    - "callback hell"
+    - "type_any_usage"
+    - "legacy_syntax"
+
+  complexity_indicators:
+    simple:
+      - "research"
+      - "explain"
+      - "what is"
+    medium:
+      - "how to integrate"
+      - "best practices for"
+    complex:
+      - "create agent that"
+      - "comprehensive guide"
+      - "production-ready"
+```
+
 
 ## How It Works
 
@@ -98,17 +231,12 @@ bindufy(
 - Skills and capabilities declaration
 - CORS origins for frontend integration
 
-## Run
+## Dependencies
 
 ```bash
-npx tsx index.ts
+npm install @bindu/sdk @langchain/openai dotenv
+npm install -D @types/node tsx
 ```
-
-Try: "Research the latest developments in quantum computing and provide a summary"
-
-Go to frontend and run npm run dev
-
-Open http://localhost:5173 and try to chat with the TypeScript LangChain agent
 
 ## Environment Setup
 
@@ -116,26 +244,80 @@ Create `.env` file:
 ```bash
 OPENAI_API_KEY=your_openai_api_key_here
 ```
+## Run
 
-## Package Dependencies
-
-Install required packages:
 ```bash
-npm install @bindu/sdk @langchain/openai dotenv
-npm install -D @types/node tsx
+npx tsx index.ts
 ```
 
-## Build Configuration
+**Examples:**
 
-Add to `tsconfig.json`:
+- "Research the latest developments in quantum computing and provide a summary"
+- "What are the main benefits of using LangChain with TypeScript?"
+- "How do I integrate LangChain with OpenAI in a TypeScript application?"
+
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
 ```json
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
-  }
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Research the latest developments in quantum computing and provide a summary"
+        }
+      ]
+    },
+     "skillId": "typescript-langchain-skill",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
 }
 ```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the TypeScript LangChain agent
+

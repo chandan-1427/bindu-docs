@@ -46,7 +46,7 @@ config = {
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },
-    "skills": ["skills/question-answering"]
+    
 }
 
 def handler(messages: list[dict]) -> list[dict]:
@@ -76,14 +76,91 @@ if __name__ == "__main__":
 - Via OpenAI-compatible API integration
 - Configurable through DSPy LM configuration
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu dspy-ai
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
 ## Run
 
 ```bash
-uv run examples/beginner/dspy-agent.py
+uv run dspy-agent.py
 ```
 
-Try: "What are the main benefits of using DSPy for prompting?"
+**Examples:**
 
-Go to frontend and run npm run dev
+- "What are the main benefits of using DSPy for prompting?"
+- "How do I create a DSPy signature for my function?"
+- "What are the key components of DSPy?"
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "What are the main benefits of using DSPy for prompting?"
+        }
+      ]
+    },
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
 
 Open http://localhost:5173 and try to chat with the DSPy agent

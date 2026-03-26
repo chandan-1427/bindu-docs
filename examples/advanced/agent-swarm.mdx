@@ -6,6 +6,8 @@ Multi-agent collaboration system with specialized roles.
 
 ## Code
 
+Create `bindu_super_agent.py` with the code below, or save it directly from your editor. 
+
 ```python
 from bindu.penguin.bindufy import bindufy
 from orchestrator import Orchestrator
@@ -59,6 +61,558 @@ bindufy(config=config, handler=handler)
 # This will create a tunnel to your agent and expose it on port 3773
 ```
 
+## Additional Files
+
+Create these supporting files in the same directory:
+
+### critic_agent.py
+```python
+from agno.agent import Agent
+from agno.models.openrouter import OpenRouter
+import os
+
+def build_critic_agent():
+    return Agent(
+        name="Critic",
+        model=OpenRouter(
+            id="openai/gpt-oss-120b",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            temperature=0.1
+        ),
+        description=(
+            "You are a critical reviewer and quality assurance expert.\n\n"
+
+            "⚠️ CRITICAL OUTPUT RULE ⚠️\n"
+            "Output ONLY the final, polished, improved version of the content.\n"
+            "DO NOT include any of the following:\n"
+            "- Your evaluation process\n"
+            "- Criticism or analysis sections\n"
+            "- Headings like 'Evaluation', 'Constructive Criticism', 'Improved Version'\n"
+            "- Meta-commentary about what you changed\n"
+            "- Explanations of improvements made\n\n"
+
+            "Your Internal Process (DO NOT OUTPUT THIS):\n"
+            "1. Read the provided content\n"
+            "2. Identify errors, ambiguities, missing information\n"
+            "3. Note structural improvements needed\n"
+            "4. Mentally create the enhanced version\n\n"
+
+            "What to Fix (internally):\n"
+            "- Factual errors → Correct them silently\n"
+            "- Unclear phrasing → Rewrite for clarity\n"
+            "- Missing information → Add it seamlessly\n"
+            "- Poor structure → Reorganize logically\n"
+            "- Redundancy → Remove it\n"
+            "- Ambiguity → Make it specific\n\n"
+
+            "Output Format:\n"
+            "Start directly with the enhanced content.\n"
+            "No preamble. No evaluation. No meta-text.\n"
+            "Just the polished, professional final answer.\n\n"
+
+            "Example of CORRECT output:\n"
+            "Input: 'Python is programming language. It good for data.'\n"
+            "Output: 'Python is a high-level programming language renowned for its versatility...'\n\n"
+
+            "Example of WRONG output (DO NOT DO THIS):\n"
+            "Input: 'Python is programming language.'\n"
+            "Output: 'Evaluation: Grammar errors found. Improved Version: Python is a high-level...'\n\n"
+
+            "Remember: Your output should look like the ORIGINAL content, just better.\n"
+            "The user should not know it was critiqued - they should just see excellent content."
+        ),
+
+    )
+```
+
+### orchestrator.py
+```python
+from researcher_agent import build_research_agent
+from summarizer_agent import build_summarizer_agent
+from critic_agent import build_critic_agent
+from planner_agent import build_planner_agent
+from reflection_agent import build_reflection_agent
+
+import json
+import re
+import time
+from typing import Any, Dict, Optional
+
+
+class Orchestrator:
+    def __init__(self):
+        self.planner_agent = build_planner_agent()
+        self.research_agent = build_research_agent()
+        self.summarizer_agent = build_summarizer_agent()
+        self.critic_agent = build_critic_agent()
+        self.reflection_agent = build_reflection_agent()
+
+
+    @staticmethod
+    def safe_json_loads(raw: str, fallback: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        try:
+            raw = raw.strip()
+
+            if raw.startswith("```"):
+                raw = re.sub(r"```(?:json)?", "", raw).strip()
+                raw = raw.replace("```", "").strip()
+
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if match:
+                raw = match.group()
+
+            parsed = json.loads(raw)
+            print(f"✅ JSON parsed successfully: {parsed}")
+            return parsed
+
+        except Exception as e:
+            print("⚠️ JSON parse failed:", e)
+            print("Raw output (first 200 chars):", raw[:200])
+            return fallback or {}
+
+
+    @staticmethod
+    def _extract_final_content(critic_output: str) -> str:
+        """
+        Extract only the final polished version from critic output,
+        removing any evaluation or analysis sections.
+        """
+        markers = [
+            "Polished, Professional Final Version:",
+            "Enhanced Version:",
+            "Improved Version:",
+            "Final Version:",
+            "Refined Version:",
+            "Corrected Version:",
+            "Updated Version:"
+        ]
+
+        for marker in markers:
+            if marker in critic_output:
+                parts = critic_output.split(marker, 1)
+                if len(parts) > 1:
+                    return parts[1].strip()
+
+        lines = critic_output.split('\n')
+
+        skip_keywords = [
+            'evaluation', 'criticism', 'critique', 'weakness',
+            'analysis', 'improvement:', 'constructive',
+            'here\'s a', 'here is a', 'refined version',
+            'suggested changes', 'issues found'
+        ]
+
+        content_start = 0
+        for i, line in enumerate(lines):
+            lower_line = line.lower().strip()
+
+            if not lower_line:
+                continue
+
+            is_meta = any(keyword in lower_line for keyword in skip_keywords)
+
+            if is_meta:
+                content_start = i + 1
+            else:
+                break
+
+        final_content = '\n'.join(lines[content_start:]).strip()
+
+        return final_content if final_content else critic_output
+
+
+    def safe_agent_call(self, agent, input_text: str, agent_name: str, retries: int = 2) -> str:
+        """
+        Execute agent with retry + graceful fallback.
+        """
+        for attempt in range(retries + 1):
+            try:
+                print(f"    {agent_name} attempt {attempt + 1}")
+                response = agent.run(input_text)
+                content = response.to_dict()["content"]
+
+                snippet = content[:150] + "..." if len(content) > 150 else content
+                print(f"    ✅ {agent_name} completed: {snippet}")
+
+                return content
+
+            except Exception as e:
+                print(f"   ❌ {agent_name} failed:", str(e))
+
+                if attempt < retries:
+                    wait_time = 1.5 * (attempt + 1)
+                    print(f"   ⏳ Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+
+                print(f"   ⚠️ {agent_name} permanently failed, returning partial context.")
+                return input_text
+
+
+    def run(self, query: str) -> str:
+        MAX_SWARM_RETRIES = 2
+
+        for swarm_attempt in range(MAX_SWARM_RETRIES + 1):
+            print(f"\n{'='*60}")
+            print(f"🚀 Swarm Attempt {swarm_attempt + 1}/{MAX_SWARM_RETRIES + 1}")
+            print(f"{'='*60}")
+
+            plan_output = self.safe_agent_call(
+                self.planner_agent, query, "planner"
+            )
+
+            plan = self.safe_json_loads(plan_output, fallback={"steps": []})
+            steps = plan.get("steps", [])
+
+            if not steps:
+                print("⚠️ Planner failed to generate steps")
+                if swarm_attempt < MAX_SWARM_RETRIES:
+                    print("   Retrying swarm...")
+                    continue
+                return "Unable to generate execution plan after multiple attempts."
+
+            print(f"\n📋 Execution Plan: {len(steps)} steps")
+            for i, step in enumerate(steps, 1):
+                print(f"   {i}. {step.get('agent', 'unknown').upper()}: {step.get('task', 'N/A')[:80]}...")
+
+            context = query
+
+            for idx, step in enumerate(steps, start=1):
+                agent_name = step.get("agent")
+                task_instruction = step.get("task", "")
+
+                if not agent_name:
+                    print(f"\n⚠️ Skipping invalid step: {step}")
+                    continue
+
+                print(f"\n{'─'*60}")
+                print(f"⚡ Step {idx}/{len(steps)}: {agent_name.upper()}")
+                print(f"{'─'*60}")
+
+                if idx == 1:
+                    agent_input = f"{task_instruction}\n\nQuery: {query}"
+                else:
+                    agent_input = f"{task_instruction}\n\nPrevious output to work with:\n{context}"
+
+                if agent_name == "researcher":
+                    context = self.safe_agent_call(
+                        self.research_agent, agent_input, "researcher"
+                    )
+
+                elif agent_name == "summarizer":
+                    context = self.safe_agent_call(
+                        self.summarizer_agent, agent_input, "summarizer"
+                    )
+
+                elif agent_name == "critic":
+                    raw_critic_output = self.safe_agent_call(
+                        self.critic_agent, agent_input, "critic"
+                    )
+                    context = self._extract_final_content(raw_critic_output)
+                    print(f"    🧹 Cleaned critic output (first 150 chars): {context[:150]}...")
+
+                else:
+                    print(f"⚠️ Unknown agent: {agent_name}")
+                    continue
+
+            print(f"\n{'─'*60}")
+            print("🧠 Reflection Phase")
+            print(f"{'─'*60}")
+
+            reflection_output = self.safe_agent_call(
+                self.reflection_agent, context, "reflection"
+            )
+
+            feedback = self.safe_json_loads(
+                reflection_output,
+                fallback={"quality": "unknown", "fix_strategy": ""}
+            )
+
+            quality = feedback.get("quality", "unknown")
+            issues = feedback.get("issues", [])
+            fix_strategy = feedback.get("fix_strategy", "")
+
+            print(f"\n📊 Quality Assessment: {quality.upper()}")
+            if issues:
+                print(f"⚠️ Issues found: {', '.join(issues)}")
+
+            if quality == "good":
+                print("\n" + "="*60)
+                print("✅ Output validated by reflection agent - SUCCESS!")
+                print("="*60)
+                return context
+
+            print("\n⚠️ Output needs improvement")
+            if fix_strategy:
+                print(f"🔧 Fix Strategy: {fix_strategy}")
+
+            if swarm_attempt < MAX_SWARM_RETRIES:
+                print(f"\n🔄 Preparing retry {swarm_attempt + 2}/{MAX_SWARM_RETRIES + 1}...")
+                query = f"""
+Improve the following answer using this strategy:
+
+{fix_strategy}
+
+Answer:
+{context}
+"""
+            else:
+                print("\n⚠️ Max retries reached - returning best available output")
+
+        print("\n" + "="*60)
+        print("⚠️ Swarm completed with warnings - returning final context")
+        print("="*60)
+        return context
+```
+
+### planner_agent.py
+```python
+from agno.agent import Agent
+from agno.models.openrouter import OpenRouter
+import os
+
+
+def build_planner_agent():
+    return Agent(
+        name="Planner Agent",
+        model=OpenRouter(
+            id="openai/gpt-oss-120b",  # Fast and good at following instructions
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            temperature=0
+        ),
+        description="""You are a strict JSON-only planning agent.
+
+CRITICAL RULES:
+1. Output ONLY valid JSON - no markdown, no explanations, no text before or after
+2. Do NOT wrap JSON in ```json``` code blocks
+3. Do NOT add any commentary
+4. Steps MUST directly answer the user's request
+5.Do NOT change or generalize the user's goal
+
+Your EXACT output format:
+{"steps":[{"agent":"researcher","task":"specific task description"},{"agent":"summarizer","task":"specific task description"},{"agent":"critic","task":"specific task description"}]}
+
+Available agents:
+- researcher: Deep research on topics
+- summarizer: Create concise summaries
+- critic: Critical analysis and evaluation
+
+Example input: "What is quantum computing?"
+Example output: {"steps":[{"agent":"researcher","task":"Research quantum computing fundamentals, applications, and current state"},{"agent":"summarizer","task":"Summarize the research findings into key points"},{"agent":"critic","task":"Evaluate the completeness and accuracy of the summary"}]}
+
+Remember: ONLY output the JSON object, nothing else.""",
+    )
+```
+
+### reflection_agent.py
+```python
+from agno.agent import Agent
+from agno.models.openrouter import OpenRouter
+import os
+
+
+def build_reflection_agent():
+    return Agent(
+        name="Reflection Agent",
+        model=OpenRouter(
+            id="openai/gpt-oss-120b",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            temperature=0
+        ),
+        description="""You are a strict JSON-only quality evaluation agent.
+
+CRITICAL RULES:
+1. Output ONLY valid JSON - no markdown, no explanations, no text
+2. Do NOT wrap JSON in ```json``` code blocks
+3. Do NOT add any commentary or explanations
+
+Your EXACT output format:
+{"quality":"good","issues":[],"fix_strategy":""}
+
+OR
+
+{"quality":"bad","issues":["issue 1","issue 2"],"fix_strategy":"specific improvement strategy"}
+
+Quality Evaluation Criteria:
+- "good": Response is accurate, complete, well-structured, and directly answers the question
+- "bad": Response has factual errors, missing information, poor structure, or doesn't answer the question
+
+For "good" responses:
+- Set issues to empty array []
+- Set fix_strategy to empty string ""
+
+For "bad" responses:
+- List specific issues found
+- Provide concrete fix_strategy (e.g., "Add more examples and define technical terms")
+
+Example Input: "Machine Learning is about computers learning stuff."
+Example Output: {"quality":"bad","issues":["Too vague","Missing key concepts","No structure"],"fix_strategy":"Provide proper definition, explain types of ML, add real-world applications"}
+
+Example Input: "Machine Learning is a subset of AI that uses algorithms to learn from data..."
+Example Output: {"quality":"good","issues":[],"fix_strategy":""}
+
+Remember: ONLY output the JSON object, nothing else.""",
+
+    )
+```
+
+### researcher_agent.py
+```python
+from agno.agent import Agent
+from agno.models.openrouter import OpenRouter
+import os
+
+def build_research_agent():
+    return Agent(
+        name="Researcher",
+        model=OpenRouter(
+            id="openai/gpt-oss-120b",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            temperature=0.3  # Slightly higher for creative research
+        ),
+
+        description=(
+            "You are a deep research agent with expertise across multiple domains. "
+            "Your task is to explore topics thoroughly and provide comprehensive, accurate information.\n\n"
+
+            "Research Guidelines:\n"
+            "1. Identify and explain key concepts and definitions\n"
+            "2. Provide historical context and evolution of the topic\n"
+            "3. Explain current state-of-the-art and recent developments\n"
+            "4. Include real-world applications and use cases\n"
+            "5. Mention important methodologies, techniques, or frameworks\n"
+            "6. Note any challenges, limitations, or controversies\n"
+            "7. Highlight future trends and directions\n\n"
+
+            "Output Format:\n"
+            "- Use clear, structured paragraphs\n"
+            "- Include specific examples and technical details\n"
+            "- Cite important facts, figures, or statistics when relevant\n"
+            "- Organize information logically from foundational to advanced\n"
+            "- Maintain technical accuracy while being accessible\n\n"
+
+            "Return a comprehensive research report that serves as a solid foundation "
+            "for summarization and critical analysis."
+        ),
+    )
+```
+
+### summarizer_agent.py
+```python
+from agno.agent import Agent
+from agno.models.openrouter import OpenRouter
+import os
+
+def build_summarizer_agent():
+    return Agent(
+        name="Summarizer",
+        model=OpenRouter(
+            id="openai/gpt-oss-120b",
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            temperature=0.2  # Low but allows slight creativity for clarity
+        ),
+        description=(
+            "You are a professional technical summarizer with expertise in distilling complex information.\n\n"
+
+            "Summarization Principles:\n"
+            "1. Extract core insights and key takeaways\n"
+            "2. Preserve technical accuracy while improving clarity\n"
+            "3. Focus on 'signal over noise' - keep what matters most\n"
+            "4. Maintain logical flow and coherent structure\n"
+            "5. Use clear, concise language without oversimplifying\n"
+            "6. Retain critical examples, statistics, and specific details\n"
+            "7. Remove redundancy and verbose explanations\n\n"
+
+            "Output Guidelines:\n"
+            "- Start with a clear overview or main concept\n"
+            "- Organize information in order of importance\n"
+            "- Use bullet points or short paragraphs for readability\n"
+            "- Keep technical terms but ensure they're explained\n"
+            "- Aim for 30-50% of original length while retaining 90%+ of value\n"
+            "- End with key applications or implications if relevant\n\n"
+
+            "Your goal: Create a summary that someone could read in 2-3 minutes "
+            "and understand the essence of the topic thoroughly."
+        ),
+
+    )
+```
+
+## Skill Configuration
+
+Create `skills/agent-swarm-intelligence/skill.yaml`:
+
+```yaml
+# Agent Swarm Intelligence Skill
+# Advanced multi-agent system with specialized roles and collaborative intelligence
+
+id: agent-swarm-intelligence
+name: Agent Swarm Intelligence
+version: 1.0.0
+author: nivasm2823@gmail.com
+
+description: |
+  Advanced multi-agent intelligence system that orchestrates specialized AI agents
+  for comprehensive research, analysis, and content generation.
+
+  Features:
+  - Multi-agent orchestration with 6 specialized agents
+  - Deep research capabilities across multiple domains
+  - Intelligent planning and task decomposition
+  - Quality assurance through critic and reflection agents
+  - Structured summarization and content refinement
+  - Collaborative intelligence emergence
+
+  Agent Swarm Architecture:
+  - Planner Agent: Breaks down complex tasks into structured steps
+  - Researcher Agent: Conducts deep research and information gathering
+  - Summarizer Agent: Creates concise, structured summaries
+  - Critic Agent: Provides quality assessment and content improvement
+  - Reflection Agent: Evaluates output quality and suggests improvements
+  - Orchestrator: Coordinates all agents and manages workflow
+
+  This system demonstrates the future of AI - collaborative agent societies
+  working together to produce high-quality, comprehensive outputs.
+tags:
+  - multi-agent
+  - research
+  - analysis
+  - planning
+  - summarization
+  - quality-assurance
+  - collaboration
+  - intelligence
+  - orchestration
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "What is quantum computing and how does it work?"
+  - "Explain impact of artificial intelligence on healthcare"
+  - "Research latest developments in renewable energy"
+  - "Analyze current state of blockchain technology"
+  - "Provide a comprehensive overview of machine learning"
+capabilities_detail:
+  multi_agent_orchestration:
+    supported: true
+    description: "Coordinates 6 specialized agents for comprehensive task execution"
+  deep_research:
+    supported: true
+    description: "Conducts thorough research across multiple domains and sources"
+  intelligent_planning:
+    supported: true
+    description: "Automatically decomposes complex tasks into structured workflows"
+  quality_assurance:
+    supported: true
+    description: "Multi-layer quality evaluation through critic and reflection agents"
+  content_synthesis:
+    supported: true
+    description: "Creates structured, high-quality content from research findings"
+  collaborative_intelligence:
+    supported: true
+    description: "Emerges intelligent outputs through agent collaboration"
+```
 ## How It Works
 
 **Agent Roles**
@@ -87,18 +641,92 @@ bindufy(config=config, handler=handler)
 - Triggers automatic refinement loops
 - Max 2 retries for quality improvement
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu agno python-dotenv
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
 ## Run
 
 ```bash
-# Set API key
-echo "OPENROUTER_API_KEY=your-key-here" > examples/agent_swarm/.env
-
-# Run agent swarm
-uv run examples/agent_swarm/bindu_super_agent.py
+uv run bindu_super_agent.py
 ```
 
-Try: "Research about quantum computing and explain its applications"
+**Examples:**
 
-Go to frontend and run npm run dev
+- "What is quantum computing and how does it work?"
+- "How can I use agent swarm for collaborative problem solving?"
+- "What are the key benefits of multi-agent systems?"
 
-Open http://localhost:5173 and try to chat with agent swarm
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "What is quantum computing and how does it work?"
+        }
+      ]
+    },
+     "skillId": "agent-swarm-intelligence",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the agent swarm

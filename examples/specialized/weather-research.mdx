@@ -6,6 +6,8 @@ Weather intelligence agent providing real-time weather data and forecasts.
 
 ## Code
 
+Create `weather-research.py` with the code below, or save it directly from your editor.
+
 ```python
 import os
 from dotenv import load_dotenv
@@ -57,6 +59,64 @@ bindufy(config, handler)
 # This will create a tunnel to your agent and expose it on port 3773
 ```
 
+## Skill Configuration
+
+Create `skills/weather-research-skill/skill.yaml`:
+
+```yaml
+# Weather Research Skill
+# Advanced weather research with comprehensive meteorological analysis
+
+id: weather-research-skill
+name: weather-research-skill
+version: 1.0.0
+author: bindu.builder@getbindu.com
+
+description: |
+  Advanced weather research skill that provides comprehensive weather information,
+  forecasts, and meteorological analysis for any location worldwide.
+
+  Features:
+  - Real-time weather data via search
+  - Multi-day forecasting with confidence levels
+  - Historical weather pattern analysis
+  - Travel recommendations based on weather
+  - Severe weather alerts
+  - Climate information and trends
+
+  Uses DuckDuckGo search to find current weather conditions
+  and provides detailed analysis with both metric and imperial units.
+tags:
+  - weather
+  - forecast
+  - meteorology
+  - research
+  - climate
+  - travel
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "Get current weather conditions for New York City"
+  - "Provide 5-day weather forecast for London"
+  - "Analyze weather patterns for Tokyo"
+  - "What's the weather like in Dehradun?"
+  - "Give travel recommendations for Paris this weekend"
+capabilities_detail:
+  weather_research:
+    supported: true
+    description: "Comprehensive weather research and forecasting capabilities"
+  search_integration:
+    supported: true
+    description: "Real-time weather data search via DuckDuckGo"
+  forecasting:
+    supported: true
+    description: "Multi-day weather forecasts with confidence levels"
+  analysis:
+    supported: true
+    description: "Weather pattern analysis and trends"
+```
 ## How It Works
 
 **Weather Instructions**
@@ -81,18 +141,93 @@ bindufy(config, handler)
 - Synthesizes multiple search results
 - Formats weather data clearly
 
+
+## Dependencies
+
+```bash
+uv init
+uv add bindu agno python-dotenv
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
 ## Run
 
 ```bash
-# Set API key
-echo "OPENROUTER_API_KEY=your-key-here" > examples/weather-research/.env
-
-# Run agent
-uv run examples/weather-research/weather_research_agent.py
+uv run weather-research.py
 ```
 
-Try: "What's the weather like in Tokyo?"
+**Examples:**
 
-Go to frontend and run npm run dev
+- "What's the weather like in New York City?"
+- "Check the weather forecast for London this weekend"
+- "What's the temperature in Tokyo right now?"
 
-Open http://localhost:5173 and try to chat with weather agent
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "What's the weather like in New York City?"
+        }
+      ]
+    },
+     "skillId": "weather-research-skill",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the weather research agent

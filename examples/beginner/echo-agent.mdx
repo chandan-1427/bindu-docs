@@ -7,7 +7,7 @@ Minimal echo bot that repeats your input.
 ## Code
 
 ```python
-from bindu.penguin.bindufy import bindufy
+from bindu.bindufy import bindufy
 
 def handler(messages):
     return [{"role": "assistant", "content": messages[-1]["content"]}]
@@ -21,7 +21,6 @@ config = {
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },
-    "skills": ["skills/question-answering", "skills/pdf-processing"],
 }
 
 bindufy(config, handler)
@@ -43,18 +42,83 @@ bindufy(config, handler)
 - `name`: Agent identifier
 - `deployment.url`: Local server address
 - `deployment.expose`: Makes agent accessible
-- `skills`: Capabilities the agent can use
 
 **Bindufy**
 - Wraps your handler with Bindu protocol
 - Handles A2A communication
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu
+```
+
 ## Run
 
 ```bash
-uv run examples/beginner/echo_simple_agent.py
+uv run echo_simple_agent.py
 ```
 
-Go to frontend and run npm run dev
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Repeat after me: this is a simple echo test"
+        }
+      ]
+    },
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
 
 Open http://localhost:5173 and try to chat with echo agent

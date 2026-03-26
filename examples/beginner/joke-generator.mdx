@@ -40,7 +40,7 @@ config = {
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },
-    "skills": ["skills/question-answering", "skills/pdf-processing"],
+    
 }
 
 def handler(messages: list[dict[str, str]]):
@@ -70,14 +70,87 @@ bindufy(config, handler)
 - Via OpenRouter API
 - Sometimes it can generate offensive or inappropriate jokes :P
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu agno python-dotenv
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
 ## Run
 
 ```bash
-uv run examples/beginner/agno_example.py
+uv run agno_example.py
 ```
 
 Try: "Tell me a joke about Python programming"
 
-Go to frontend and run npm run dev
+## Example API Calls
 
-Open http://localhost:5173 and try to chat with echo agent
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": " tell me a dad joke"
+        }
+      ]
+    },
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with joke generator

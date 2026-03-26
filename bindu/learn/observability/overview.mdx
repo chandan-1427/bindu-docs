@@ -3,9 +3,61 @@ title: "Observability & Monitoring"
 description: "Monitor and debug agents with OpenTelemetry and Sentry"
 ---
 
+When agents become part of real systems, failures stop being isolated events. A slow dependency can distort latency. A missing trace can hide the real bottleneck. An uncaught error can surface long after the original cause has moved on.
+
+Without observability, debugging turns into archaeology. You piece together what happened from symptoms, logs, and guesses. That is manageable in a toy system. It becomes expensive in production.
+
+## Why Observability Matters
+
+An agent should not just do work. It should leave a clear trail of how that work moved through the system and what broke when it failed.
+
+| Minimal runtime visibility | Bindu observability |
+| --- | --- |
+| Hard to trace execution across components | Spans show how work moves through the system |
+| Errors appear without enough context | Sentry captures failures with environment and release data |
+| Difficult to compare environments | Service name, version, and deployment labels stay explicit |
+| Debugging depends on manual reconstruction | Telemetry platforms make traces and failures searchable |
+| Problems are easier to notice than explain | Observability helps teams understand cause, not just effect |
+
+That is the shift: Bindu integrates OpenTelemetry and Sentry so performance, flow, and failure can be observed directly instead of inferred after the fact.
+
+<Note>
+If an agent handles important work, it should not fail silently or perform opaquely. Teams need a way to see the path of execution, not just the final outcome.
+</Note>
+
+## How Bindu Observability Works
+
 Bindu integrates with **OpenTelemetry (OTEL)** and **Sentry** to provide comprehensive observability and error tracking for your agents. Monitor performance, trace execution flows, and debug issues using industry-standard platforms.
 
-## Architecture
+### The Observability Model
+
+Bindu splits observability into two complementary channels:
+
+```text
+OpenTelemetry -> traces and execution flow
+Sentry -> errors, releases, and performance incidents
+```
+
+Each layer answers a different question:
+
+- **OpenTelemetry** shows how work moved
+- **Sentry** shows where things failed and under what release or environment
+
+<CardGroup cols={3}>
+  <Card title="Traceable" icon="route">
+    OpenTelemetry creates spans so developers can follow execution across the runtime.
+  </Card>
+  <Card title="Actionable" icon="bug">
+    Sentry captures failures with context that helps teams respond faster.
+  </Card>
+  <Card title="Portable" icon="globe">
+    OTLP-compatible telemetry can be sent to platforms like Langfuse or Arize without changing the agent model.
+  </Card>
+</CardGroup>
+
+### The Lifecycle: Instrument, Export, Diagnose
+
+Let's break the observability flow down before we look at configuration.
 
 ```mermaid
 sequenceDiagram
@@ -43,6 +95,28 @@ sequenceDiagram
         Sentry->>ObservabilityPlatform: Send to Sentry.io
     end
 ```
+
+What this means is simple: observability begins at startup, stays close to runtime, and keeps a durable record of how work flowed and where it failed.
+
+<Steps>
+  <Step title="Instrument">
+    On startup, Bindu checks whether telemetry and Sentry are enabled. If they are, it initializes the tracer provider, OTLP exporter, span processor, and Sentry SDK with the right environment and release metadata.
+
+    This matters because good observability starts before the first request, not after the first incident.
+  </Step>
+
+  <Step title="Export">
+    Once the agent is running, spans are created and exported asynchronously to an OTEL-compatible backend, while Sentry captures exceptions and performance information through its own pipeline.
+
+    The effect is that one system explains flow and the other explains failure.
+  </Step>
+
+  <Step title="Diagnose">
+    When something goes wrong, teams can inspect traces for path-level visibility and use Sentry for release-aware error context, stack traces, and performance events.
+
+    Together, they shorten the distance between "something broke" and "we know why."
+  </Step>
+</Steps>
 
 ## OpenTelemetry Setup
 
@@ -90,12 +164,14 @@ OLTP_BATCH_SCHEDULE_DELAY_MILLIS=5000
    - Create new key pair (public and secret)
 
 3. **Encode Credentials**:
+
    ```bash
    # Base64 encode "public-key:secret-key"
    echo -n "pk-xxx:sk-xxx" | base64
    ```
 
 4. **Configure Environment**:
+
    ```bash
    TELEMETRY_ENABLED=true
    OLTP_ENDPOINT=https://cloud.langfuse.com/api/public/otel/v1/traces
@@ -113,6 +189,7 @@ OLTP_BATCH_SCHEDULE_DELAY_MILLIS=5000
    - Copy Space ID and API Key
 
 3. **Configure Environment**:
+
    ```bash
    TELEMETRY_ENABLED=true
    OLTP_ENDPOINT=https://otlp.arize.com/v1
@@ -159,6 +236,7 @@ SENTRY_DEBUG=false
    - Copy the DSN from project settings
 
 3. **Configure Environment**:
+
    ```bash
    SENTRY_ENABLED=true
    SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
@@ -170,7 +248,7 @@ SENTRY_DEBUG=false
 
 ## Agent Configuration
 
-No code changes needed - observability is configured via environment variables:
+No code changes are needed. Observability is configured via environment variables:
 
 ```python
 config = {
@@ -183,6 +261,8 @@ config = {
 
 bindufy(config, handler)
 ```
+
+That separation is deliberate. The agent defines behavior. The environment defines how deeply that behavior should be observed.
 
 ## Best Practices
 
@@ -200,7 +280,7 @@ SENTRY_PROFILES_SAMPLE_RATE=0.1
 
 ### Environment Separation
 
-Use different environments for development/production:
+Use different environments for development and production:
 
 ```bash
 # Development
@@ -225,9 +305,40 @@ sentry_sdk.set_context("business", {
 sentry_sdk.set_tag("feature", "pdf-processing")
 ```
 
+## The Value Of Observable Systems
+
+Observability only matters if it helps teams move from confusion to explanation.
+
+This model gives you:
+
+- **execution transparency** - traces reveal how requests move through the system
+- **failure context** - Sentry attaches environment, release, and runtime detail to errors
+- **faster debugging** - teams can inspect cause and path instead of relying on symptoms
+
+This is the point of the whole model: as agents become more capable and more connected, their internal behavior should become easier to illuminate, not harder.
+
 ## Related
 
 - [OpenTelemetry Python](https://opentelemetry.io/docs/instrumentation/python/)
 - [Langfuse Documentation](https://langfuse.com/docs)
 - [Arize Documentation](https://docs.arize.com/)
 - [Sentry Python SDK](https://docs.sentry.io/platforms/python/)
+
+---
+
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+
+  <span className="brand-quote-text">
+    Bindu brings clarity to your agents{" "}
+    <span className="brand-quote-highlight">
+      each one visible, traceable, and growing in trust&nbsp;
+    </span>
+    across the Internet of Agents.
+  </span>
+</span>

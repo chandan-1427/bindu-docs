@@ -1,30 +1,36 @@
 ---
-title: 'Building SDKs for New Languages'
-description: 'Step-by-step guide for adding Rust, Go, Swift, or any language support'
+title: 'Custom SDKs'
+description: 'How to build Bindu SDKs for Rust, Go, Swift, or any language with gRPC'
 ---
 
-You want to add Bindu support for Rust, Go, Swift, or another language. Here's what's involved.
+This page is for power users. If you want to bring Bindu to Rust, Go, Swift, or another language, the goal is not to rewrite the core. The goal is to build a new **driver** that can plug into the same **engine**.
+
+That is why Bindu's SDK story stays small. The sidecar keeps infrastructure centralized, so each new language only needs a thin adapter.
 
 ---
 
 ## What an SDK Does
 
-An SDK is a thin wrapper — typically 200-400 lines — that hides gRPC from the developer. From their perspective, they call `bindufy(config, handler)` and get a microservice. The SDK handles everything in between.
+An SDK is a thin wrapper, usually **200-400 lines**, that hides gRPC from the developer. From their point of view, they call `bindufy(config, handler)` and get a microservice.
 
-Concretely, an SDK does four things:
+Under the hood, the SDK does four things:
 
-1. **Implements `AgentHandler`** — a gRPC server that receives `HandleMessages` calls from the core and invokes the developer's handler
-2. **Calls `BinduService.RegisterAgent`** — a gRPC client that registers the agent with the core
-3. **Launches the Python core** — spawns `bindu serve --grpc` as a child process
-4. **Exposes `bindufy(config, handler)`** — the developer-facing API that orchestrates all of the above
+1. **Implements `AgentHandler`** - a gRPC server that receives `HandleMessages` calls from the core and invokes the developer's handler
+2. **Calls `BinduService.RegisterAgent`** - a gRPC client that registers the agent with the core
+3. **Launches the Python core** - spawns `bindu serve --grpc` as a child process
+4. **Exposes `bindufy(config, handler)`** - the developer-facing API that orchestrates all of the above
 
-The proto contract at `proto/agent_handler.proto` is the single source of truth. As long as your SDK speaks the same proto, it works with any version of the core.
+The proto contract at `proto/agent_handler.proto` is the single source of truth. As long as your SDK speaks that contract, it works with the core.
+
+<Info>
+The architectural rule is simple: **new languages get new drivers, not new engines**.
+</Info>
 
 ---
 
 ## Step 1: Generate gRPC Stubs
 
-Every language has a protoc plugin. Generate client and server stubs from the proto:
+The first job is to generate typed client and server stubs from the protobuf definition.
 
 | Language | Tool | Command |
 |----------|------|---------|
@@ -33,19 +39,19 @@ Every language has a protoc plugin. Generate client and server stubs from the pr
 | Swift | `grpc-swift` | `protoc --swift_out=. --grpc-swift_out=. proto/agent_handler.proto` |
 | C# | `Grpc.Tools` | NuGet package auto-generates from `.proto` in the project |
 
-The generated code gives you typed message classes and service interfaces.
+The generated code gives you typed messages and service interfaces. Everything else in the SDK is built on top of those stubs.
 
 ---
 
 ## Step 2: Implement AgentHandler (Server)
 
-The core calls three methods on your SDK. You need to implement them:
+Once you have stubs, build the server that the core will call during execution.
 
 ### HandleMessages
 
-The critical one. Receives conversation history, calls the developer's handler, returns the response.
+This is the critical RPC. It receives conversation history, calls the developer's handler, and returns the response.
 
-```
+```text
 Input:  HandleRequest { messages: [ChatMessage{role, content}, ...] }
 Output: HandleResponse { content: string, state: string, prompt: string, is_final: bool }
 ```
@@ -58,9 +64,9 @@ Output: HandleResponse { content: string, state: string, prompt: string, is_fina
 
 ### GetCapabilities
 
-Return static info about the SDK.
+Return static info about the SDK:
 
-```
+```text
 Output: GetCapabilitiesResponse { name, description, version, supports_streaming }
 ```
 
@@ -68,40 +74,44 @@ Output: GetCapabilitiesResponse { name, description, version, supports_streaming
 
 Return `{healthy: true, message: "OK"}`.
 
+This server is the language-specific half of the sidecar. It is how the **engine** talks back to the **driver**.
+
 ---
 
 ## Step 3: Implement BinduService Client
 
-Your SDK needs to call two methods on the core:
+Now build the client that talks from your SDK into the core.
 
 ### RegisterAgent
 
-Sends config, skills, and the SDK's callback address.
+This sends config, skills, and the SDK's callback address:
 
-```
+```text
 Input: RegisterAgentRequest {
-  config_json: string,       // Full config as JSON
-  skills: [SkillDefinition], // Skills with raw file content
-  grpc_callback_address: string  // e.g., "localhost:50052"
+  config_json: string,            // Full config as JSON
+  skills: [SkillDefinition],      // Skills with raw file content
+  grpc_callback_address: string   // e.g., "localhost:50052"
 }
 Output: RegisterAgentResponse { success, agent_id, did, agent_url, error }
 ```
 
-The `config_json` is a JSON string matching the Python `bindufy()` config format. This is intentional — the config schema lives in one place (Python), and SDKs just serialize to JSON.
+The `config_json` is a JSON string matching the Python `bindufy()` config format. That is intentional. The schema lives in one place, and SDKs serialize to it.
 
 ### Heartbeat
 
-Call every 30 seconds to signal liveness.
+Call this every 30 seconds to signal liveness:
 
-```
+```text
 Input: HeartbeatRequest { agent_id, timestamp }
 ```
+
+Together, `RegisterAgent` and `Heartbeat` are the minimum control plane for the sidecar.
 
 ---
 
 ## Step 4: Implement Core Launcher
 
-The SDK needs to start the Python core as a child process. The logic:
+The SDK must be able to start the engine automatically. That is what makes the developer experience feel local even though the architecture is split.
 
 <Steps>
   <Step title="Check if bindu CLI is available">
@@ -133,9 +143,9 @@ The SDK needs to start the Python core as a child process. The logic:
 
 ## Step 5: Implement `bindufy()`
 
-Wire everything together in a single function:
+At this point, you can wire the SDK together behind one developer-facing function:
 
-```
+```text
 function bindufy(config, handler):
     skills = read_skill_files(config.skills)
     callback_port = start_agent_handler_server(handler)
@@ -146,13 +156,13 @@ function bindufy(config, handler):
     print("Agent registered! A2A URL: {result.agent_url}")
 ```
 
-That's the entire SDK. Everything else is type definitions and error handling.
+That is the whole idea. The SDK should feel small because the core already does the heavy lifting.
 
 ---
 
 ## Skill Loading
 
-Skills are files in the developer's project. The SDK reads them and sends the content in the `RegisterAgent` call:
+Skills live in the developer's project, not in the core. The SDK is responsible for reading them and shipping their contents during registration.
 
 <Steps>
   <Step title="For each skill path in config.skills">
@@ -172,26 +182,31 @@ Skills are files in the developer's project. The SDK reads them and sends the co
   </Step>
 </Steps>
 
-The core processes the skill content without needing filesystem access to the SDK's project.
+The core can then process the skill content without needing filesystem access to the SDK's project.
 
 ---
 
 ## Testing Your SDK
 
+The fastest way to keep an SDK honest is to test both the transport and the sidecar lifecycle.
+
 ### Unit test
+
 Mock the gRPC channel and verify `HandleMessages` correctly invokes the handler and serializes the response.
 
 ### Integration test
+
 Start a real Bindu core with `bindu serve --grpc`, register an agent from your SDK, send an A2A message, and verify the response. The Python E2E tests in `tests/integration/grpc/test_grpc_e2e.py` show exactly this pattern.
 
 ### Smoke test
-Run one of the examples end-to-end and `curl` the agent.
+
+Run one of the examples end to end and `curl` the agent.
 
 ---
 
 ## Reference: TypeScript SDK
 
-The TypeScript SDK at `sdks/typescript/` is the reference implementation. Study these files:
+If you want a concrete model, the TypeScript SDK is the reference implementation.
 
 | File | What it does | Lines |
 |------|-------------|-------|
@@ -201,13 +216,22 @@ The TypeScript SDK at `sdks/typescript/` is the reference implementation. Study 
 | `src/core-launcher.ts` | Spawns Python core | ~170 |
 | `src/types.ts` | TypeScript interfaces | ~120 |
 
-**Total: ~745 lines.** That's the entire SDK. Most of that is type definitions and error handling. The core logic is under 300 lines.
+**Total: ~745 lines.** Most of that is type definitions and error handling. The core logic is under 300 lines.
+
+<CardGroup cols={2}>
+  <Card title="TypeScript SDK" icon="code" href="/bindu/grpc/agent-client">
+    See how the reference driver behaves from the developer's point of view
+  </Card>
+  <Card title="API Reference" icon="book" href="/bindu/grpc/api-reference">
+    Review the protobuf messages and service contracts directly
+  </Card>
+</CardGroup>
 
 ---
 
 ## Publishing
 
-Publish to your language's package registry:
+Once the SDK works, publish it to the language's standard package registry:
 
 | Language | Registry | Package name convention |
 |----------|----------|----------------------|
@@ -215,6 +239,10 @@ Publish to your language's package registry:
 | Go | Go modules | `github.com/getbindu/bindu-sdk-go` |
 | Swift | Swift Package Manager | `bindu-sdk` |
 | C# | NuGet | `Bindu.Sdk` |
+
+<Info>
+Include the proto file in the package so users do not need to download it separately.
+</Info>
 
 ---
 
@@ -225,12 +253,11 @@ Publish to your language's package registry:
     width="32"
     className="clean-icon"
   />
-
   <span className="brand-quote-text">
-    Bindu ensures{" "}
+    Because the infrastructure is entirely decoupled, building a new SDK is just a matter of{" "}
     <span className="brand-quote-highlight">
-      SDKs and the core
+      satisfying the gRPC contract
     </span>
-    , behave like one system across languages.
+    , not rewriting the core engine.
   </span>
 </span>

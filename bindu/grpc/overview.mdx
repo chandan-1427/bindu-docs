@@ -1,0 +1,445 @@
+---
+title: 'gRPC Overview'
+description: 'Why the gRPC sidecar exists, how the architecture works, and where the current limits are'
+---
+
+## The Problem
+
+You built a great agent in TypeScript. It uses the OpenAI SDK, calls GPT-4o, and handles multi-turn conversations. But turning it into a real microservice means rebuilding identity, authentication, payments, scheduling, storage, and the A2A protocol.
+
+That is the expensive part. And if the next team wants Kotlin or Rust, you do it all again.
+
+## The Sidecar Model
+
+Bindu solves that with a **sidecar architecture**. You write the logic, like the **driver** of the agent. The Bindu Core runs beside it like the **engine**, handling infrastructure you should not have to reimplement.
+
+<CodeGroup>
+  ```python Python
+  bindufy(config, handler)  # handler runs in the same process
+  ```
+
+  ```typescript TypeScript
+  bindufy(config, handler)  // handler runs here, infrastructure runs in Python
+  ```
+</CodeGroup>
+
+Same function name. Same config shape. Same result. Different language, same microservice.
+
+The gRPC layer stays out of the developer's way. They do not write proto files, start gRPC servers, or think about serialization. They call `bindufy()`, write a handler, and get the full Bindu stack.
+
+## The Big Picture
+
+Once the sidecar idea clicks, the rest of the model becomes easier to follow. One process owns the agent logic. The other owns the infrastructure.
+
+```text
+Their TypeScript code                    Bindu Core (Python, auto-started)
++---------------------+                  +----------------------------+
+|                     |                  |                            |
+|  OpenAI SDK         |  1. Register     |  Config validation         |
+|  LangChain          | ------gRPC-----> |  DID key generation        |
+|  Any framework      |                  |  Auth (Hydra OAuth2)       |
+|                     |                  |  x402 payment setup        |
+|  handler(messages)  |  2. Execute      |  Manifest creation         |
+|  <------gRPC--------|----------------  |  Scheduler + Storage       |
+|                     |                  |  HTTP/A2A server (:3773)   |
++---------------------+                  +----------------------------+
+        SDK process                              Core process
+     (developer's language)                   (Python, invisible)
+```
+
+Two processes. One terminal. The developer sees their app. The SDK quietly manages the Python child process.
+
+---
+
+## Why Two Processes?
+
+Because the alternative is worse.
+
+**Option A:** Rewrite the Bindu Core in every language. DID, auth, x402, scheduler, storage, A2A protocol in TypeScript, then Kotlin, then Rust. Every bug gets fixed multiple times.
+
+**Option B:** Keep one core, connect to it over a wire, and let thin SDKs translate between the developer and the core.
+
+Bindu chooses **Option B**. The sidecar is the boundary, and **gRPC is the wire**.
+
+## What Actually Happens
+
+At runtime, the sidecar model turns into a short sequence of concrete steps.
+
+### 1. The SDK starts the Bindu Core as a child process
+
+The Python core handles DID, auth, x402, scheduling, storage, and the HTTP server. The developer does not run a separate service manually. The SDK detects how to launch it and spawns it.
+
+### 2. The SDK registers the agent over gRPC
+
+It sends the config, skills, and callback address to the core. The core runs the full `bindufy` pipeline and starts an A2A HTTP server.
+
+### 3. When messages arrive, the core calls the SDK's handler over gRPC
+
+A client sends an A2A message to `:3773`. The core receives it, builds task context, and calls `manifest.run(messages)`. For a gRPC agent, that becomes a `HandleMessages` call back to the SDK process.
+
+```text
+Client --HTTP--> Bindu Core --gRPC--> TypeScript Handler --> OpenAI
+        :3773    (Python)    :3774      (your code)
+
+        DID, Auth, x402                 Just the handler.
+        Scheduler, Storage              That's all you write.
+        A2A protocol
+```
+
+That is the sidecar contract in one line: **you drive the logic, the core runs the engine**.
+
+---
+
+## Two Services, Two Directions
+
+The sidecar pattern only works because calls move both ways. The SDK talks to the core during registration. The core talks back to the SDK during execution.
+
+### BinduService (lives in the Python core on `:3774`)
+
+The SDK calls this to register and manage its agent:
+
+| Method | What it does |
+|--------|-------------|
+| `RegisterAgent` | "Here is my config, skills, and callback address. Turn me into a microservice." |
+| `Heartbeat` | "I am still alive." (every 30 seconds) |
+| `UnregisterAgent` | "I am shutting down. Clean up." |
+
+### AgentHandler (lives in the SDK on a dynamic port)
+
+The core calls this when work arrives:
+
+| Method | What it does |
+|--------|-------------|
+| `HandleMessages` | "A user sent this message. Run your handler and give me the response." |
+| `GetCapabilities` | "What can you do?" |
+| `HealthCheck` | "Are you still there?" |
+
+This is why Bindu uses gRPC instead of REST here. Both sides need to initiate calls cleanly.
+
+---
+
+## Message Flow
+
+Now we can follow one request from the outside world to your code and back again.
+
+A user sends "What is the capital of France?" to a TypeScript agent that has already been bindufied:
+
+<Steps>
+  <Step title="User sends HTTP POST to :3773">
+    ```json
+    {"method": "message/send", "params": {"message": {"text": "What is the capital of France?"}}}
+    ```
+  </Step>
+
+  <Step title="Bindu Core receives the request">
+    TaskManager creates a task, Scheduler queues it
+  </Step>
+
+  <Step title="ManifestWorker picks up the task">
+    Builds conversation history from storage, calls `manifest.run(messages)`
+  </Step>
+
+  <Step title="manifest.run is a GrpcAgentClient">
+    Converts messages to protobuf, calls `HandleMessages` on the SDK's gRPC server
+  </Step>
+
+  <Step title="TypeScript SDK receives the call">
+    Deserializes messages: `[{role: "user", content: "What is the capital of France?"}]`
+    Calls the developer's handler function
+  </Step>
+
+  <Step title="Developer's handler runs">
+    ```typescript
+    const response = await openai.chat.completions.create({model: "gpt-4o", messages})
+    ```
+    Returns "The capital of France is Paris."
+  </Step>
+
+  <Step title="SDK sends the response back over gRPC">
+    `HandleResponse {content: "The capital of France is Paris."}`
+  </Step>
+
+  <Step title="GrpcAgentClient receives the response">
+    Returns the string to ManifestWorker
+  </Step>
+
+  <Step title="ManifestWorker processes the result">
+    ResultProcessor normalizes it -> ResponseDetector determines task state -> "completed"
+    ArtifactBuilder creates a DID-signed artifact
+  </Step>
+
+  <Step title="Core sends the A2A response back to the user">
+    Task completed, with DID signature on the artifact
+  </Step>
+</Steps>
+
+The round trip is usually **~2-5 seconds**. The gRPC overhead is **~1-5ms**. Most of the time is the LLM call.
+
+---
+
+## The Invisible Bridge
+
+Inside the core, one component keeps this model elegant: `GrpcAgentClient`.
+
+It is a Python class that behaves like a handler function. `ManifestWorker` calls it the same way it would call a local Python handler:
+
+```python
+raw_results = self.manifest.run(message_history or [])
+```
+
+For a Python agent, `manifest.run` is local. For a gRPC agent, it is a `GrpcAgentClient` instance. The rest of the pipeline does not need to care.
+
+That is a key design win. **The sidecar changes the transport, not the downstream architecture.**
+
+---
+
+## Startup Lifecycle
+
+The request path explains runtime. The startup path explains how the sidecar comes alive in the first place.
+
+<Steps>
+  <Step title="SDK reads skill files">
+    Loads skill files from the project directory (yaml or markdown)
+  </Step>
+
+  <Step title="SDK starts an AgentHandler gRPC server">
+    On a random available port
+  </Step>
+
+  <Step title="SDK detects how to run Python">
+    Checks for `bindu` CLI, `uv`, or `python3`
+  </Step>
+
+  <Step title="SDK spawns the Bindu Core">
+    As a child process: `bindu serve --grpc --grpc-port 3774`
+  </Step>
+
+  <Step title="SDK waits for :3774 to be ready">
+    Polls with TCP connect, 30s timeout
+  </Step>
+
+  <Step title="SDK calls RegisterAgent">
+    With config JSON, skill data, and its callback address
+  </Step>
+
+  <Step title="Core validates config">
+    Generates agent ID, creates DID keys, sets up x402/auth
+  </Step>
+
+  <Step title="Core creates manifest">
+    With `manifest.run = GrpcAgentClient(callback_address)`
+  </Step>
+
+  <Step title="Core starts uvicorn">
+    On `:3773` in a background thread
+  </Step>
+
+  <Step title="Core returns registration result">
+    `{agent_id, did, agent_url}` to the SDK
+  </Step>
+
+  <Step title="SDK starts a heartbeat loop">
+    Pings the core every 30 seconds
+  </Step>
+
+  <Step title="SDK prints confirmation">
+    "Agent registered!" and waits for `HandleMessages` calls
+  </Step>
+</Steps>
+
+When the developer presses `Ctrl+C`, the SDK kills the Python child process and exits cleanly.
+
+---
+
+## Python vs gRPC Agents
+
+From the outside, both models look the same. Inside, the execution path is different.
+
+| | Python Agent | gRPC Agent |
+|---|---|---|
+| **Developer calls** | `bindufy(config, handler)` | `bindufy(config, handler)` (identical) |
+| **Handler runs in** | Same process as core | Separate process |
+| **Core started by** | `bindufy()` directly | SDK spawns as child process |
+| **Communication** | In-process function call | gRPC over localhost |
+| **Latency overhead** | 0ms | 1-5ms |
+| **Language** | Python only | Any language with gRPC |
+| **DID, auth, x402** | Full support | Full support (identical) |
+| **Skills** | Loaded from filesystem | Sent as data during registration |
+| **Streaming** | Supported | Not yet implemented |
+
+<Info>
+From the outside, there is **no visible difference**. The agent card looks the same. The DID is generated the same way. The A2A responses have the same structure. The artifacts carry the same DID signatures. A client cannot tell whether the agent behind `:3773` is Python, TypeScript, or Kotlin.
+</Info>
+
+---
+
+## Real Examples
+
+The sidecar model is easiest to trust when you can see it in real projects.
+
+<CardGroup cols={2}>
+  <Card title="TypeScript + OpenAI" icon="code" href="https://github.com/getbindu/bindu/tree/main/examples/typescript-openai-agent">
+    GPT-4o agent with one `bindufy()` call
+  </Card>
+  <Card title="TypeScript + LangChain" icon="link" href="https://github.com/getbindu/bindu/tree/main/examples/typescript-langchain-agent">
+    LangChain.js research assistant
+  </Card>
+  <Card title="Kotlin + OpenAI" icon="code" href="https://github.com/getbindu/bindu/tree/main/examples/kotlin-openai-agent">
+    Kotlin agent with the same pattern
+  </Card>
+</CardGroup>
+
+---
+
+## Quick Test
+
+If you want to validate the transport layer before writing SDK code, you can test the core directly with `grpcurl`.
+
+```bash
+uv run bindu serve --grpc
+
+# In another terminal:
+grpcurl -plaintext localhost:3774 list
+# -> bindu.grpc.AgentHandler
+# -> bindu.grpc.BinduService
+```
+
+Register an agent from `grpcurl`:
+
+```bash
+grpcurl -plaintext -emit-defaults \
+  -proto proto/agent_handler.proto \
+  -import-path proto \
+  -d '{
+    "config_json": "{\"author\":\"test@example.com\",\"name\":\"test-agent\",\"description\":\"Test\",\"deployment\":{\"url\":\"http://localhost:3773\",\"expose\":true}}",
+    "skills": [],
+    "grpc_callback_address": "localhost:50052"
+  }' \
+  localhost:3774 bindu.grpc.BinduService.RegisterAgent
+
+# -> {"success": true, "agentId": "...", "did": "did:bindu:...", "agentUrl": "http://localhost:3773"}
+```
+
+That response means the full `bindufy` pipeline ran: config validation, DID key generation, manifest creation, and HTTP server startup.
+
+---
+
+## Ports
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| `:3773` | HTTP | A2A protocol (clients connect here) |
+| `:3774` | gRPC | Agent registration (SDKs connect here) |
+| `:XXXXX` | gRPC | Handler execution (core calls SDKs here, dynamic port) |
+
+---
+
+## Known Limitations
+
+The sidecar model already gives you **full parity for core infrastructure**. The current gaps are about transport features, resilience, and operations.
+
+### Streaming Responses
+
+**Status: Not implemented**
+
+The proto defines `HandleMessagesStream`, a server-side streaming RPC where the SDK yields response chunks incrementally. But `GrpcAgentClient` does not call it. Remote agents can only return complete responses.
+
+For short answers, this usually does not matter. For long answers, the UX is worse because users wait for the whole response at once.
+
+#### Workaround
+
+Return complete responses. Most agents do this anyway. The gap matters most in chat-like interfaces where perceived latency matters.
+
+#### What needs to happen
+
+<Steps>
+  <Step title="Add stream_messages() method to GrpcAgentClient">
+    Implement the streaming client
+  </Step>
+
+  <Step title="Wire it into ManifestWorker">
+    For streaming task execution
+  </Step>
+
+  <Step title="Update SDK AgentHandler">
+    To support streaming handlers
+  </Step>
+
+  <Step title="Add E2E tests">
+    For streaming round-trips
+  </Step>
+</Steps>
+
+### No TLS
+
+gRPC connections use `grpc.insecure_channel`. Traffic between the core and SDK is unencrypted.
+
+<Info>
+**Why it is okay for now:** The core and SDK run on the same machine (`localhost`). The SDK spawns the core as a child process. There is no network exposure.
+</Info>
+
+<Warning>
+**When it matters:** If you deploy the core and SDK on different machines, or in a zero-trust network environment. TLS/mTLS support is planned.
+</Warning>
+
+### No Automatic Reconnection
+
+If the SDK process crashes mid-execution, the `GrpcAgentClient` does not retry. The task fails, and the agent must be re-registered.
+
+ManifestWorker catches the gRPC `UNAVAILABLE` error and marks the task as failed. The user gets an error response. On restart, the SDK calls `RegisterAgent` again.
+
+### No Connection Pooling
+
+Each `GrpcAgentClient` creates a single gRPC channel. Under high concurrency, all calls share one channel.
+
+That is fine for most agents because gRPC multiplexes well. At very high concurrency, connection pooling would reduce contention.
+
+### No gRPC-Specific Metrics
+
+The `/metrics` endpoint reports HTTP request metrics but not gRPC call metrics. You cannot see `HandleMessages` latency, error rates, or call counts in the dashboard.
+
+**Workaround:** check the core log output, which includes timing information for each handler call.
+
+### No Load Balancing
+
+If you run two instances of the same TypeScript agent, each one registers separately with a different callback address. There is no built-in routing to spread load across instances.
+
+**Workaround:** use a reverse proxy such as Envoy in front of the SDK instances, and register the proxy address as the callback.
+
+### Feature Comparison
+
+| Feature | Python Agents | gRPC Agents |
+|---------|--------------|-------------|
+| Unary responses | works | works |
+| Streaming responses | works | **not implemented** |
+| DID identity | works | works |
+| x402 payments | works | works |
+| Skills | works | works |
+| State transitions (input-required) | works | works |
+| Health checks | works | works |
+| Multi-language | Python only | any language |
+| Latency overhead | 0ms | 1-5ms |
+| TLS | N/A (in-process) | **not implemented** |
+| Auto-reconnection | N/A (in-process) | **not implemented** |
+
+<Info>
+**Bottom line:** the **driver/engine split** is already solid. gRPC agents have parity with Python agents for identity, auth, payments, skills, and the A2A protocol. The missing pieces are streaming, security hardening, and resilience.
+</Info>
+
+---
+
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+  <span className="brand-quote-text">
+    Escape the infrastructure trap by keeping your logic entirely decoupled from{" "}
+    <span className="brand-quote-highlight">
+      identity, protocols, and routing
+    </span>
+    .
+  </span>
+</span>

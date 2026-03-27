@@ -81,7 +81,7 @@ Next, install the SDK and your app dependencies.
 
 ```bash
 npm install @bindu/sdk openai dotenv
-npm install -D tsx typescript
+npm install -D tsx typescript @types/node
 ```
 
 **What each package does:**
@@ -244,9 +244,9 @@ curl -s -X POST http://localhost:3773 \
       "message": {
         "role": "user",
         "parts": [{"kind": "text", "text": "What is the capital of France?"}],
-        "messageId": "msg-001",
-        "contextId": "ctx-001",
-        "taskId": "task-001",
+        "messageId": "11111111-1111-1111-1111-111111111111",
+        "contextId": "22222222-2222-2222-2222-222222222222",
+        "taskId": "33333333-3333-3333-3333-333333333333",
         "kind": "message"
       },
       "configuration": {
@@ -254,7 +254,7 @@ curl -s -X POST http://localhost:3773 \
         "blocking": true
       }
     },
-    "id": "test-1"
+    "id": "11111111-1111-1111-1111-111111111111"
   }' | python3 -m json.tool
 ```
 

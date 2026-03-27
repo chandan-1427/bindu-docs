@@ -1,17 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ==========================================================================
    1. GLOBAL VARIABLES (LIGHT MODE DEFAULT)
    ========================================================================== */
 :root {
   /* Typography */
-  --font-family: "Geist", system-ui, -apple-system, sans-serif;
-  --font-mono: "Geist Mono", monospace;
-  --line-height: 1.65;
+  --font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --line-height: 1.7; /* Slightly increased for elegance and readability */
   
   /* Core Theme Colors */
   --text-color: #1f2937; 
-  --text-color-alt: #475569; 
+  --text-color-alt: #64748b; /* Softened slightly for a more subtle look */
   --background-color: #fafafa; 
   --background-color-alt: #f1f5f9; 
   
@@ -70,6 +70,9 @@ body {
   font-family: var(--font-family);
   line-height: var(--line-height);
   color: var(--text-color);
+  -webkit-font-smoothing: antialiased; /* Makes text look razor-sharp on Mac/iOS */
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Force specific blocks to retain monospace font across the UI */
@@ -288,4 +291,63 @@ html.dark .brand-quote-text {
 
 html.dark .brand-quote-highlight {
   color: #ffffff; /* dark:text-white */
+}
+
+/* ==========================================================================
+   8. TYPOGRAPHY & VISUAL HIERARCHY
+   ========================================================================== */
+
+/* --- 1. The Sidebar Fix --- 
+   Mintlify defaults the sidebar to a very small size. We target the aside/nav 
+   elements to bump the size and add a touch of letter spacing for legibility. */
+aside a, 
+aside button,
+[data-testid="sidebar"] a,
+[data-testid="sidebar"] button {
+  font-size: 0.95rem !important; 
+  letter-spacing: 0.01em;
+}
+
+/* --- 2. Main Content Base Text --- 
+   Targeting .prose ensures we only affect the markdown content area, 
+   leaving UI elements alone. */
+.prose p, 
+.prose ul, 
+.prose ol, 
+.prose li {
+  font-size: 1.05rem !important; /* Bumps base reading size up from 16px */
+  line-height: 1.75 !important;  /* Gives the text room to breathe */
+}
+
+/* --- 3. Heading Hierarchy --- 
+   Creates distinct size and weight differences so the page is highly scannable. */
+
+.prose h1 {
+  font-size: 2.0rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important; /* Tighter tracking for large headers */
+  margin-bottom: 1.5rem !important;
+}
+
+.prose h2 {
+  font-size: 1.35rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  margin-top: 3rem !important; /* Extra space above H2s to chunk sections */
+  margin-bottom: 1rem !important;
+}
+
+.prose h3 {
+  font-size: 1.15rem !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  margin-top: 2rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Slight bump for inline code inside standard text so it doesn't look dwarfed 
+   now that the base paragraph size is larger */
+.prose p > code, 
+.prose li > code {
+  font-size: 0.9em !important;
 }

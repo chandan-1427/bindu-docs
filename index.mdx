@@ -1,0 +1,719 @@
+---
+title: Welcome to Bindu
+description: Build A2A-native agents with DID identity, gRPC sidecars, skills, payments, and production-ready infrastructure.
+mode: custom
+---
+
+export const CodeTabs = ({ tabs, defaultTab }) => {
+  const [activeTab, setActiveTab] = React.useState(defaultTab || tabs[0]?.id);
+  const currentTab = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        .code-tab-btn {
+          padding: 0;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 14px;
+          transition: color 0.2s ease;
+          color: #71717a;
+          font-weight: 400;
+        }
+        .code-tab-btn.active {
+          color: #18181b;
+          font-weight: 600;
+        }
+        .dark .code-tab-btn.active {
+          color: #f4f4f5;
+        }
+        .code-tab-bracket {
+          margin-right: 4px;
+          visibility: hidden;
+        }
+        .code-tab-bracket-right {
+          margin-left: 4px;
+          visibility: hidden;
+        }
+        .code-tab-btn.active .code-tab-bracket,
+        .code-tab-btn.active .code-tab-bracket-right {
+          visibility: visible;
+        }
+      `,
+        }}
+      />
+      <div className="grid grid-cols-2 gap-4 md:flex md:gap-8 justify-center">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={isActive ? "code-tab-btn active" : "code-tab-btn"}
+            >
+              <span className="code-tab-bracket">[</span>
+              {tab.label}
+              <span className="code-tab-bracket-right">]</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        .code-box {
+          position: relative;
+          border-radius: 16px;
+          border: 1px solid #27272a;
+          background: #09090b;
+          padding: 20px;
+          overflow: auto;
+        }
+        .code-box pre {
+          margin: 0;
+          padding: 0;
+          overflow: auto;
+          font-size: 13px;
+          line-height: 1.8;
+          font-family: "JetBrains Mono", "Fira Code", Monaco, Consolas, monospace;
+        }
+        .code-box code {
+          color: #e5e7eb;
+          white-space: pre;
+        }
+        .code-lang {
+          display: block;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
+          color: #8B5CF6;
+          margin-bottom: 16px;
+          font-weight: 600;
+        }
+      `,
+        }}
+      />
+      <div className="code-box">
+        <pre>
+          <code>
+            {currentTab?.language && (
+              <span className="code-lang">{currentTab.language}</span>
+            )}
+            {currentTab?.code}
+          </code>
+        </pre>
+      </div>
+    </div>
+  );
+};
+
+export const codeTabs = [
+  {
+    id: "python",
+    label: "Basic Agent",
+    language: "python",
+    code: (
+      <>
+        <span style={{ color: "#8B5CF6" }}>from</span> bindu.penguin.bindufy{" "}
+        <span style={{ color: "#8B5CF6" }}>import</span> bindufy{"\n"}
+        {"\n"}
+        config = {"{"}{"\n"}
+        {"    "}
+        <span style={{ color: "#c3e88d" }}>"author"</span>:{" "}
+        <span style={{ color: "#c3e88d" }}>"dev@example.com"</span>,{"\n"}
+        {"    "}
+        <span style={{ color: "#c3e88d" }}>"name"</span>:{" "}
+        <span style={{ color: "#c3e88d" }}>"hello-bindu"</span>,{"\n"}
+        {"    "}
+        <span style={{ color: "#c3e88d" }}>"description"</span>:{" "}
+        <span style={{ color: "#c3e88d" }}>"A simple Bindu agent"</span>,{"\n"}
+        {"    "}
+        <span style={{ color: "#c3e88d" }}>"deployment"</span>: {"{"}
+        <span style={{ color: "#c3e88d" }}>"url"</span>:{" "}
+        <span style={{ color: "#c3e88d" }}>"http://localhost:3773"</span>,{" "}
+        <span style={{ color: "#c3e88d" }}>"expose"</span>:{" "}
+        <span style={{ color: "#8B5CF6" }}>True</span>
+        {"}"},{"\n"}
+        {"}"}{"\n"}
+        {"\n"}
+        <span style={{ color: "#8B5CF6" }}>def</span> handler(messages):{"\n"}
+        {"    "}
+        <span style={{ color: "#8B5CF6" }}>return</span>{" "}
+        <span style={{ color: "#c3e88d" }}>"Hello from Bindu!"</span>
+        {"\n"}
+        {"\n"}
+        bindufy(config, handler)
+      </>
+    ),
+  },
+  {
+    id: "typescript",
+    label: "TypeScript SDK",
+    language: "typescript",
+    code: (
+      <>
+        <span style={{ color: "#8B5CF6" }}>import</span> {"{"} bindufy {"}"}{" "}
+        <span style={{ color: "#8B5CF6" }}>from</span>{" "}
+        <span style={{ color: "#c3e88d" }}>"@getbindu/sdk"</span>;{"\n"}
+        {"\n"}
+        <span style={{ color: "#8B5CF6" }}>const</span> config = {"{"}{"\n"}
+        {"  "}author: <span style={{ color: "#c3e88d" }}>"dev@example.com"</span>,{"\n"}
+        {"  "}name: <span style={{ color: "#c3e88d" }}>"ts-bindu-agent"</span>,{"\n"}
+        {"  "}description:{" "}
+        <span style={{ color: "#c3e88d" }}>"A TypeScript Bindu agent"</span>,{"\n"}
+        {"  "}deployment: {"{"}{"\n"}
+        {"    "}url: <span style={{ color: "#c3e88d" }}>"http://localhost:3773"</span>,{"\n"}
+        {"    "}expose: <span style={{ color: "#8B5CF6" }}>true</span>,{"\n"}
+        {"  "}{"}"},{"\n"}
+        {"}"};{"\n"}
+        {"\n"}
+        <span style={{ color: "#8B5CF6" }}>const</span> handler ={" "}
+        <span style={{ color: "#8B5CF6" }}>async</span> (messages) =&gt; {"{"}{"\n"}
+        {"  "}
+        <span style={{ color: "#8B5CF6" }}>return</span>{" "}
+        <span style={{ color: "#c3e88d" }}>"Hello from TypeScript and Bindu!"</span>;{"\n"}
+        {"}"};{"\n"}
+        {"\n"}
+        <span style={{ color: "#8B5CF6" }}>await</span> bindufy(config, handler);
+      </>
+    ),
+  },
+  {
+    id: "skills",
+    label: "Skills System",
+    language: "yaml",
+    code: (
+      <>
+        name: <span style={{ color: "#c3e88d" }}>question-answering</span>
+        {"\n"}
+        description:{" "}
+        <span style={{ color: "#c3e88d" }}>
+          Answer user questions with a grounded response
+        </span>
+        {"\n"}
+        version: <span style={{ color: "#c3e88d" }}>"1.0.0"</span>
+        {"\n"}
+        author: <span style={{ color: "#c3e88d" }}>dev@example.com</span>
+        {"\n"}
+        tags:{"\n"}
+        {"  "}- <span style={{ color: "#c3e88d" }}>qa</span>
+        {"\n"}
+        {"  "}- <span style={{ color: "#c3e88d" }}>assistant</span>
+        {"\n"}
+        input_modes:{"\n"}
+        {"  "}- <span style={{ color: "#c3e88d" }}>text</span>
+        {"\n"}
+        output_modes:{"\n"}
+        {"  "}- <span style={{ color: "#c3e88d" }}>text</span>
+        {"\n"}
+        {"\n"}
+        <span style={{ color: "#71717a" }}>
+          # Place this in skills/question-answering/skill.yaml
+        </span>
+      </>
+    ),
+  },
+];
+
+<div className="relative mx-[calc(50%-50vw)] bg-[#f6f7f9] dark:bg-[#111113] py-16 md:py-16 border-y border-[#e5e7eb] dark:border-zinc-800 overflow-hidden">
+  <div
+    className="absolute inset-0 pointer-events-none opacity-30 dark:opacity-0"
+    style={{
+      backgroundImage:
+        "linear-gradient(#d1d5db 1px, transparent 1px), linear-gradient(90deg, #d1d5db 1px, transparent 1px)",
+      backgroundSize: "290px 290px",
+      backgroundPosition: "center",
+    }}
+  />
+
+  <div className="relative mx-auto flex max-w-6xl flex-col px-5 sm:px-8 lg:px-10">
+    <header className="flex flex-col gap-3 rounded-full border border-[#e5e7eb] dark:border-zinc-700 bg-white dark:bg-zinc-900 px-5 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+          Bindu
+        </span>
+        <span className="rounded-full border border-[#e5e7eb] dark:border-zinc-700 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">
+          Docs
+        </span>
+      </div>
+      <div className="flex items-center gap-3">
+        <a
+          href="/bindu/introduction/what-is-bindu"
+          className="rounded-full border border-[#d1d5db] dark:border-zinc-600 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-800 dark:text-zinc-100 transition hover:bg-zinc-50 dark:hover:bg-zinc-700"
+        >
+          Read the docs
+        </a>
+        <a
+          href="https://github.com/getbindu/bindu"
+          className="rounded-full border border-[#8B5CF6] bg-[#8B5CF6] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(139,92,246,0.25)] transition hover:bg-[#7C3AED]"
+        >
+          View on GitHub
+        </a>
+      </div>
+    </header>
+
+    <section className="mt-20 flex flex-col items-center gap-6 text-center">
+      <h1 className="text-4xl font-semibold leading-[1.05] text-zinc-900 dark:text-zinc-100 sm:text-5xl md:text-[64px]">
+        The Open-Source Framework
+        <br />
+        <span className="inline-flex items-center">
+          for the Internet of Agents
+          {(() => {
+            // 1. Blooming Animation Loop (Flower)
+            const [step, setStep] = React.useState(0);
+            React.useEffect(() => {
+              const interval = setInterval(() => {
+                // Total steps = 45 (1 core + 12 outer + 12 inner + 20 pause steps for viewing)
+                setStep((s) => (s + 1) % 45);
+              }, 90); // 90ms creates a rapid, satisfying bloom
+              return () => clearInterval(interval);
+            }, []);
+
+            // 2. Continuous Steam Animation Loop
+            const [steamStep, setSteamStep] = React.useState(0);
+            React.useEffect(() => {
+              const interval = setInterval(() => {
+                setSteamStep((s) => (s + 1) % 100);
+              }, 50); // Fast, smooth rising interval
+              return () => clearInterval(interval);
+            }, []);
+
+            return (
+            <span
+              className="relative inline-flex items-center justify-center ml-4"
+              // Increased width/height to make the whole component bigger,
+              // and adjusted translateY slightly to keep it vertically centered with the text.
+              style={{ width: "1.2em", height: "1.2em", transform: "translateY(5px)" }}
+            >
+                <svg
+                  viewBox="0 0 120 120"
+                  style={{ width: "100%", height: "100%", overflow: "visible" }}
+                >
+                  <defs>
+                    <radialGradient id="coreGradient" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#A16207" />
+                      <stop offset="70%" stopColor="#78350F" />
+                      <stop offset="100%" stopColor="#451A03" />
+                    </radialGradient>
+
+                    <linearGradient id="petalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#FDE68A" />
+                      <stop offset="50%" stopColor="#FBBF24" />
+                      <stop offset="100%" stopColor="#F59E0B" />
+                    </linearGradient>
+
+                    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur stdDeviation="1.2" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+
+                  {/* =======================
+                      STEAM PARTICLES
+                      ======================= */}
+                  {[0, 1, 2].map((i) => {
+                    // Math for continuous, staggered upward float
+                    const offset = (steamStep + i * 33) % 100; 
+                    const translateY = -offset * 0.4;
+                    // Fade in at bottom, fade out at top
+                    const opacity = offset < 10 ? offset / 10 : offset > 80 ? (100 - offset) / 20 : 1;
+
+                    return (
+                      <circle
+                        key={`steam-${i}`}
+                        cx={50 + i * 8}
+                        cy={18 - i * 2}
+                        r={2.2 - i * 0.25}
+                        fill="#E5E7EB"
+                        style={{
+                          transform: `translateY(${translateY}px)`,
+                          opacity: opacity * 0.6,
+                        }}
+                      />
+                    );
+                  })}
+
+                  {/* =======================
+                      OUTER PETALS (Bloom First)
+                      ======================= */}
+                  {Array.from({ length: 12 }).map((_, index) => {
+                    const angle = index * 30;
+                    const isVisible = step >= index + 2; // Start after core (step 2)
+                    return (
+                      <g
+                        key={`outer-${index}`}
+                        style={{
+                          transformOrigin: "60px 60px",
+                          transform: `rotate(${angle}deg) scale(${isVisible ? 1 : 0})`,
+                          opacity: isVisible ? 1 : 0,
+                          transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out",
+                        }}
+                      >
+                        <ellipse
+                          cx="60"
+                          cy="28"
+                          rx="8"
+                          ry="22"
+                          fill="url(#petalGradient)"
+                          filter="url(#softGlow)"
+                        />
+                      </g>
+                    );
+                  })}
+
+                  {/* =======================
+                      INNER PETALS (Bloom Second)
+                      ======================= */}
+                  {Array.from({ length: 12 }).map((_, index) => {
+                    const angle = index * 30 + 15;
+                    const isVisible = step >= index + 14; // Start after outer petals
+                    return (
+                      <g
+                        key={`inner-${index}`}
+                        style={{
+                          transformOrigin: "60px 60px",
+                          transform: `rotate(${angle}deg) scale(${isVisible ? 1 : 0})`,
+                          opacity: isVisible ? 0.9 : 0,
+                          transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out",
+                        }}
+                      >
+                        <ellipse
+                          cx="60"
+                          cy="36"
+                          rx="5.5"
+                          ry="14"
+                          fill="#FACC15"
+                        />
+                      </g>
+                    );
+                  })}
+
+                  {/* =======================
+                      CORE & TEXTURE
+                      ======================= */}
+                  <g
+                    style={{
+                      transformOrigin: "60px 60px",
+                      transform: step >= 1 ? "scale(1)" : "scale(0)",
+                      opacity: step >= 1 ? 1 : 0,
+                      transition: "transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out",
+                    }}
+                  >
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="18"
+                      fill="url(#coreGradient)"
+                      filter="url(#softGlow)"
+                    />
+                    {/* Texture Dots */}
+                    {Array.from({ length: 18 }).map((_, i) => {
+                      const angle = (i / 18) * Math.PI * 2;
+                      const radius = i % 2 === 0 ? 7 : 11;
+                      const x = 60 + Math.cos(angle) * radius;
+                      const y = 60 + Math.sin(angle) * radius;
+                      return (
+                        <circle
+                          key={`dot-${i}`}
+                          cx={x}
+                          cy={y}
+                          r="1.4"
+                          fill="#2D1606"
+                          opacity="0.65"
+                        />
+                      );
+                    })}
+                  </g>
+                </svg>
+              </span>
+            );
+          })()}
+        </span>
+      </h1>
+
+      <p className="max-w-3xl text-base leading-relaxed text-zinc-600 dark:text-zinc-300 sm:text-lg">
+        Build agents that speak A2A, carry DID-native identity, expose
+        production-ready infrastructure, and still let you write the logic in
+        the language your team prefers.
+      </p>
+
+      <div className="mt-12 grid w-full max-w-5xl grid-cols-1 gap-4 md:grid-cols-3">
+        <a
+          href="/bindu/introduction/what-is-bindu"
+          className="group relative flex flex-col gap-2 rounded-xl bg-[#f6f7f9] dark:bg-zinc-900 border border-[#e5e7eb] dark:border-zinc-700 p-5 transition hover:border-[#e5e7eb] dark:hover:border-zinc-600"
+        >
+          <span className="pointer-events-none absolute -left-2 -top-2 h-4 w-4 border-l-2 border-t-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -right-2 -top-2 h-4 w-4 border-r-2 border-t-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -bottom-2 -left-2 h-4 w-4 border-b-2 border-l-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -bottom-2 -right-2 h-4 w-4 border-b-2 border-r-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+
+          <h3 className="text-base font-semibold text-start text-zinc-900 dark:text-zinc-100">
+            Get Started
+          </h3>
+          <p className="text-xs leading-relaxed text-start text-zinc-500 dark:text-zinc-400">
+            Learn the core concepts and build your first A2A protocol agent.
+          </p>
+        </a>
+
+        <a
+          href="/bindu/grpc/overview"
+          className="group relative flex flex-col gap-2 rounded-xl border border-[#e5e7eb] dark:border-zinc-700 bg-[#f6f7f9] dark:bg-zinc-900 p-5 transition hover:border-[#e5e7eb] dark:hover:border-zinc-600"
+        >
+          <span className="pointer-events-none absolute -left-2 -top-2 h-4 w-4 border-l-2 border-t-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -right-2 -top-2 h-4 w-4 border-r-2 border-t-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -bottom-2 -left-2 h-4 w-4 border-b-2 border-l-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -bottom-2 -right-2 h-4 w-4 border-b-2 border-r-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+
+          <h3 className="text-base font-semibold text-start text-zinc-900 dark:text-zinc-100">
+            The Sidecar Architecture
+          </h3>
+          <p className="text-xs leading-relaxed text-start text-zinc-500 dark:text-zinc-400">
+            Write agent logic in any language while the Python core handles
+            infrastructure.
+          </p>
+        </a>
+
+        <a
+          href="/examples/beginner/echo-agent"
+          className="group relative flex flex-col gap-2 rounded-xl border border-[#e5e7eb] dark:border-zinc-700 bg-[#f6f7f9] dark:bg-zinc-900 p-5 transition hover:border-[#e5e7eb] dark:hover:border-zinc-600"
+        >
+          <span className="pointer-events-none absolute -left-2 -top-2 h-4 w-4 border-l-2 border-t-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -right-2 -top-2 h-4 w-4 border-r-2 border-t-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -bottom-2 -left-2 h-4 w-4 border-b-2 border-l-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+          <span className="pointer-events-none absolute -bottom-2 -right-2 h-4 w-4 border-b-2 border-r-2 border-[#8B5CF6] opacity-0 transition-opacity group-hover:opacity-100" />
+
+          <h3 className="text-base font-semibold text-start text-zinc-900 dark:text-zinc-100">
+            Ecosystem & Cookbook
+          </h3>
+          <p className="text-xs leading-relaxed text-start text-zinc-500 dark:text-zinc-400">
+            Explore production patterns, from basic agents to multi-agent
+            swarms.
+          </p>
+        </a>
+      </div>
+    </section>
+
+    <section className="mt-20 flex flex-col gap-6">
+      <div className="flex flex-col gap-2 text-center">
+        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-zinc-500 dark:text-zinc-400">
+          Build with bindu
+        </p>
+      </div>
+      <div className="lg:p-10">
+        <CodeTabs tabs={codeTabs} defaultTab="python" />
+      </div>
+    </section>
+
+    <section className="mt-20 pb-12">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-5 sm:px-8 lg:grid-cols-5 lg:px-10">
+        <div>
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+            Get Started
+          </h3>
+          <ul className="space-y-3">
+            <li>
+              <a
+                href="/bindu/introduction/what-is-bindu"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                What is Bindu?
+              </a>
+            </li>
+            <li>
+              <a
+                href="/bindu/introduction/key-concepts"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Key Concepts
+              </a>
+            </li>
+            <li>
+              <a
+                href="/bindu/how-to/install"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Install
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+            Architecture
+          </h3>
+          <ul className="space-y-3">
+            <li>
+              <a
+                href="/bindu/concepts/protocol"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                The Protocol
+              </a>
+            </li>
+            <li>
+              <a
+                href="/bindu/concepts/task-first-pattern"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Task-First Pattern
+              </a>
+            </li>
+            <li>
+              <a
+                href="/bindu/grpc/overview"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                gRPC Overview
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+            Features
+          </h3>
+          <ul className="space-y-3">
+            <li>
+              <a
+                href="/bindu/learn/did/overview"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                DID Identity
+              </a>
+            </li>
+            <li>
+              <a
+                href="/bindu/learn/payment/introduction"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                x402 Payments
+              </a>
+            </li>
+            <li>
+              <a
+                href="/bindu/learn/storage/overview"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Storage
+              </a>
+            </li>
+            <li>
+              <a
+                href="/bindu/learn/scheduler/overview"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Scheduler
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+            Reference
+          </h3>
+          <ul className="space-y-3">
+            <li>
+              <a
+                href="/openapi.yaml"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                API Docs
+              </a>
+            </li>
+            <li>
+              <a
+                href="/examples/beginner/echo-agent"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Cookbook
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+            Community
+          </h3>
+          <ul className="space-y-3">
+            <li>
+              <a
+                href="https://github.com/getbindu/bindu"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                GitHub
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://getbindu.com"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Website
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://discord.com/invite/3w5zuYUuwt"
+                className="text-sm text-zinc-500 dark:text-zinc-400 transition hover:text-[#8B5CF6]"
+              >
+                Discord
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="mx-auto mt-12 flex max-w-6xl items-center justify-between px-5 pt-8 sm:px-8 lg:px-10">
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          {"\u00A9"} 2025 Bindu. All rights reserved.
+        </p>
+        <div className="flex items-center gap-4">
+          <a
+            href="https://x.com/raahulrahl"
+            className="text-zinc-400 dark:text-zinc-500 transition hover:text-[#8B5CF6]"
+          >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+          </a>
+          <a
+            href="https://github.com/getbindu"
+            className="text-zinc-400 dark:text-zinc-500 transition hover:text-[#8B5CF6]"
+          >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+            </svg>
+          </a>
+          <a
+            href="https://discord.com/invite/3w5zuYUuwt"
+            className="text-zinc-400 dark:text-zinc-500 transition hover:text-[#8B5CF6]"
+          >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028 14.09 14.09 0 001.226-1.994.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+            </svg>
+          </a>
+          <a
+            href="https://getbindu.com"
+            className="text-zinc-400 dark:text-zinc-500 transition hover:text-[#8B5CF6]"
+          >
+            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.93 9h-3.16a15.87 15.87 0 00-1.15-4.31A8.03 8.03 0 0118.93 11zM12 4.07c.89 1.08 1.97 3.14 2.52 6.93H9.48C10.03 7.21 11.11 5.15 12 4.07zM4.07 13h3.16c.17 1.59.55 3.07 1.15 4.31A8.03 8.03 0 014.07 13zm3.16-2H4.07a8.03 8.03 0 014.31-4.31A15.87 15.87 0 007.23 11zm4.77 8.93c-.89-1.08-1.97-3.14-2.52-6.93h5.04c-.55 3.79-1.63 5.85-2.52 6.93zM15.62 17.31c.6-1.24.98-2.72 1.15-4.31h3.16a8.03 8.03 0 01-4.31 4.31z" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

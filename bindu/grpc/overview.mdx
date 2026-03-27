@@ -3,15 +3,21 @@ title: 'gRPC Overview'
 description: 'Why the gRPC sidecar exists, how the architecture works, and where the current limits are'
 ---
 
-## The Problem
+## The Multi-Language Problem
 
-You built a great agent in TypeScript. It uses the OpenAI SDK, calls GPT-4o, and handles multi-turn conversations. But turning it into a real microservice means rebuilding identity, authentication, payments, scheduling, storage, and the A2A protocol.
+You want to build agent intelligence. What you keep getting dragged into is infrastructure.
 
-That is the expensive part. And if the next team wants Kotlin or Rust, you do it all again.
+You ship a solid TypeScript handler. Then someone asks for Kotlin. Then Python. Suddenly the real work is no longer prompts, tools, or reasoning. It is rebuilding auth, DID identity, A2A protocol handling, x402 payments, scheduling, storage, and service plumbing for every language.
 
-## The Sidecar Model
+That is the **infrastructure trap**. The part that should be reusable becomes the part you rewrite the most.
 
-Bindu solves that with a **sidecar architecture**. You write the logic, like the **driver** of the agent. The Bindu Core runs beside it like the **engine**, handling infrastructure you should not have to reimplement.
+## The Goal: Language-Agnostic Agents
+
+The goal is simple: make the developer write only the **brain** and let one reusable runtime provide the **body**.
+
+That means a language-agnostic architecture where the public API stays the same, the infrastructure stays centralized, and teams can move between TypeScript, Kotlin, and Python without losing features or behavior.
+
+The contract should feel boring in the best way:
 
 <CodeGroup>
   ```python Python
@@ -23,13 +29,27 @@ Bindu solves that with a **sidecar architecture**. You write the logic, like the
   ```
 </CodeGroup>
 
-Same function name. Same config shape. Same result. Different language, same microservice.
+Same function name. Same config shape. Same outcome. Different language, same microservice.
 
-The gRPC layer stays out of the developer's way. They do not write proto files, start gRPC servers, or think about serialization. They call `bindufy()`, write a handler, and get the full Bindu stack.
+## The gRPC Sidecar Architecture
 
-## The Big Picture
+Bindu solves the trap with the **sidecar model**.
 
-Once the sidecar idea clicks, the rest of the model becomes easier to follow. One process owns the agent logic. The other owns the infrastructure.
+The SDK is the **driver**. It owns your logic, your framework choices, and your handler.
+
+The Python Core is the **engine**. It owns the infrastructure: config validation, DID generation, auth, x402, scheduling, storage, manifest creation, and the A2A-facing HTTP server.
+
+The bridge between them is **gRPC**: a high-performance, open-source RPC framework built on **HTTP/2** and **Protocol Buffers**. Bindu uses it here instead of standard REST for three reasons:
+
+- **Strict typing** keeps the SDKs and core aligned on one contract.
+- **Low latency** keeps the local transport overhead tiny compared with the LLM call.
+- **Bidirectional calls** let the SDK register with the core, then let the core call back into the SDK when work arrives.
+
+The gRPC layer stays out of your way. You do not write proto files, manually boot a second service, or think about serialization. You call `bindufy()`, write the handler, and the SDK wires up the rest.
+
+### The Big Picture
+
+One process owns the logic. The other owns the infrastructure.
 
 ```text
 Their TypeScript code                    Bindu Core (Python, auto-started)
@@ -47,35 +67,35 @@ Their TypeScript code                    Bindu Core (Python, auto-started)
      (developer's language)                   (Python, invisible)
 ```
 
-Two processes. One terminal. The developer sees their app. The SDK quietly manages the Python child process.
+Two processes. One terminal. You see your app. The SDK quietly manages the Python child process.
 
 ---
 
-## Why Two Processes?
+### Why Two Processes?
 
-Because the alternative is worse.
+Because the alternatives are worse.
 
-**Option A:** Rewrite the Bindu Core in every language. DID, auth, x402, scheduler, storage, A2A protocol in TypeScript, then Kotlin, then Rust. Every bug gets fixed multiple times.
+**Option A:** Rewrite the core in every language. DID, auth, x402, scheduler, storage, A2A in TypeScript, then Kotlin, then Python, then whatever comes next. Every bug gets fixed multiple times.
 
-**Option B:** Keep one core, connect to it over a wire, and let thin SDKs translate between the developer and the core.
+**Option B:** Keep one core, put a clean wire protocol in front of it, and let thin SDKs translate between the developer and that core.
 
 Bindu chooses **Option B**. The sidecar is the boundary, and **gRPC is the wire**.
 
-## What Actually Happens
+### What Actually Happens
 
-At runtime, the sidecar model turns into a short sequence of concrete steps.
+At runtime, the model is straightforward:
 
 ### 1. The SDK starts the Bindu Core as a child process
 
-The Python core handles DID, auth, x402, scheduling, storage, and the HTTP server. The developer does not run a separate service manually. The SDK detects how to launch it and spawns it.
+The Python core handles DID, auth, x402, scheduling, storage, and the HTTP server. You do not manually run a second service. The SDK detects how to launch it and spawns it.
 
 ### 2. The SDK registers the agent over gRPC
 
-It sends the config, skills, and callback address to the core. The core runs the full `bindufy` pipeline and starts an A2A HTTP server.
+It sends config, skills, and a callback address to the core. The core runs the full `bindufy` pipeline and starts the A2A HTTP server.
 
 ### 3. When messages arrive, the core calls the SDK's handler over gRPC
 
-A client sends an A2A message to `:3773`. The core receives it, builds task context, and calls `manifest.run(messages)`. For a gRPC agent, that becomes a `HandleMessages` call back to the SDK process.
+A client sends an A2A message to `:3773`. The core receives it, builds task context, and calls `manifest.run(messages)`. For a gRPC agent, that becomes a `HandleMessages` call back into the SDK process.
 
 ```text
 Client --HTTP--> Bindu Core --gRPC--> TypeScript Handler --> OpenAI
@@ -86,13 +106,13 @@ Client --HTTP--> Bindu Core --gRPC--> TypeScript Handler --> OpenAI
         A2A protocol
 ```
 
-That is the sidecar contract in one line: **you drive the logic, the core runs the engine**.
+That is the contract in one line: **you drive the logic, the core runs the engine**.
 
 ---
 
-## Two Services, Two Directions
+### Two Services, Two Directions
 
-The sidecar pattern only works because calls move both ways. The SDK talks to the core during registration. The core talks back to the SDK during execution.
+The sidecar works because calls move in both directions. The SDK talks to the core during startup. The core talks back to the SDK during execution.
 
 ### BinduService (lives in the Python core on `:3774`)
 
@@ -114,20 +134,25 @@ The core calls this when work arrives:
 | `GetCapabilities` | "What can you do?" |
 | `HealthCheck` | "Are you still there?" |
 
-This is why Bindu uses gRPC instead of REST here. Both sides need to initiate calls cleanly.
+This is exactly why Bindu does not use plain REST for this boundary. Both sides need typed contracts and both sides need to initiate calls cleanly.
 
 ---
 
-## Message Flow
+### Message Flow
 
-Now we can follow one request from the outside world to your code and back again.
+Follow one request from the outside world to your code and back:
 
 A user sends "What is the capital of France?" to a TypeScript agent that has already been bindufied:
 
 <Steps>
   <Step title="User sends HTTP POST to :3773">
     ```json
-    {"method": "message/send", "params": {"message": {"text": "What is the capital of France?"}}}
+    {
+      "method": "message/send", 
+      "params": {
+        "message": {"text": "What is the capital of France?"}
+      }
+    }
     ```
   </Step>
 
@@ -177,7 +202,7 @@ The round trip is usually **~2-5 seconds**. The gRPC overhead is **~1-5ms**. Mos
 
 ---
 
-## The Invisible Bridge
+### The Invisible Bridge
 
 Inside the core, one component keeps this model elegant: `GrpcAgentClient`.
 
@@ -189,11 +214,11 @@ raw_results = self.manifest.run(message_history or [])
 
 For a Python agent, `manifest.run` is local. For a gRPC agent, it is a `GrpcAgentClient` instance. The rest of the pipeline does not need to care.
 
-That is a key design win. **The sidecar changes the transport, not the downstream architecture.**
+That is the design win. **The sidecar changes the transport, not the downstream architecture.**
 
 ---
 
-## Startup Lifecycle
+### Startup Lifecycle
 
 The request path explains runtime. The startup path explains how the sidecar comes alive in the first place.
 
@@ -251,9 +276,9 @@ When the developer presses `Ctrl+C`, the SDK kills the Python child process and 
 
 ---
 
-## Python vs gRPC Agents
+### Python vs gRPC Agents
 
-From the outside, both models look the same. Inside, the execution path is different.
+From the outside, both models look the same. Inside, the transport path differs.
 
 | | Python Agent | gRPC Agent |
 |---|---|---|
@@ -273,9 +298,9 @@ From the outside, there is **no visible difference**. The agent card looks the s
 
 ---
 
-## Real Examples
+### Real Examples
 
-The sidecar model is easiest to trust when you can see it in real projects.
+The sidecar is easiest to trust when you see it show up the same way in real projects.
 
 <CardGroup cols={2}>
   <Card title="TypeScript + OpenAI" icon="code" href="https://github.com/getbindu/bindu/tree/main/examples/typescript-openai-agent">
@@ -291,7 +316,7 @@ The sidecar model is easiest to trust when you can see it in real projects.
 
 ---
 
-## Quick Test
+### Quick Test
 
 If you want to validate the transport layer before writing SDK code, you can test the core directly with `grpcurl`.
 
@@ -324,7 +349,7 @@ That response means the full `bindufy` pipeline ran: config validation, DID key 
 
 ---
 
-## Ports
+### Ports
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
@@ -334,7 +359,21 @@ That response means the full `bindufy` pipeline ran: config validation, DID key 
 
 ---
 
-## Known Limitations
+## The Payoff: Write Once, Run Anywhere
+
+The result is a language-agnostic execution model with one developer-facing entry point: `bindufy()`.
+
+You write the handler. The SDK starts the sidecar. The core handles the lifecycle. Registration, DID generation, manifest creation, HTTP startup, health checks, and heartbeats all happen without the developer carrying that complexity around.
+
+That is the payoff:
+
+- **Seamless `bindufy()` execution** across languages
+- **Invisible lifecycle management** through the SDK-managed sidecar
+- **Feature parity at the infrastructure layer** for identity, auth, payments, skills, and A2A behavior
+
+From the client side, the result is intentionally boring: same port, same agent card, same DID-signed artifacts, same protocol surface. The transport disappears. The features remain.
+
+### Known Limitations
 
 The sidecar model already gives you **full parity for core infrastructure**. The current gaps are about transport features, resilience, and operations.
 

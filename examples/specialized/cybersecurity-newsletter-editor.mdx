@@ -6,6 +6,8 @@ AI agent that researches threats and generates security newsletters.
 
 ## Code
 
+Create `cybersecurity-newsletter-editor.py` with the code below, or save it directly from your editor.
+
 ```python
 """Cybersecurity Newsletter Editor Agent — powered by Bindu"""
 
@@ -64,8 +66,7 @@ config = {
         "cors_origins": ["http://localhost:5173"],
     },
     "skills": [
-        "skills/question-answering",
-        "skills/summarization",
+        "skills/cybersecurity-newsletter-editor",
     ],
 }
 
@@ -75,6 +76,60 @@ def handler(messages: list[dict[str, str]]):
 
 # Start
 bindufy(config, handler)
+```
+
+## Skill Configuration
+
+Create `skills/cybersecurity-newsletter-editor/skill.yaml`:
+
+```yaml
+# Cybersecurity Newsletter Editor Skill
+# Provides intelligent newsletter generation capabilities for cybersecurity topics
+
+id: cybersecurity-newsletter-editor-v1
+name: cybersecurity-newsletter-editor
+version: 1.0.0
+author: your.email@example.com
+
+description: |
+  Provides intelligent newsletter generation capabilities for cybersecurity topics.
+  Use when users need professional cybersecurity newsletters with threat intelligence,
+  CVE analysis, and security recommendations.
+
+tags:
+  - newsletter
+  - cybersecurity
+  - threat-intelligence
+  - content-generation
+  - cve-analysis
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Generate this week's cybersecurity newsletter"
+  - "Create newsletter focusing on ransomware threats"
+  - "Write newsletter about latest CVEs"
+
+requirements:
+  packages: []
+  system: []
+  min_memory_mb: 100
+
+assessment:
+  keywords:
+    - newsletter
+    - cybersecurity
+    - threats
+    - cve
+    - ransomware
+    - security
+    - newsletter-generation
 ```
 
 ## How It Works
@@ -102,14 +157,92 @@ bindufy(config, handler)
 - Automated newsletter composition
 - Consistent formatting and style
 
+## Dependencies
+
+```bash
+uv init
+uv add bindu agno python-dotenv
+```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
 ## Run
 
 ```bash
-uv run examples/specialized/cybersecurity-newsletter-editor.py
+uv run cybersecurity-newsletter-editor.py
 ```
 
-Try: "Generate this week's cybersecurity newsletter focusing on ransomware threats"
+**Examples:**
 
-Go to frontend and run npm run dev
+- "Generate this week's cybersecurity newsletter focusing on ransomware threats"
+- "Create a monthly security briefing for our executive team"
+- "Summarize the latest phishing attack trends and prevention measures"
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Generate this week's cybersecurity newsletter focusing on ransomware threats"
+        }
+      ]
+    },
+     "skillId": "cybersecurity-newsletter-editor-v1",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
 
 Open http://localhost:5173 and try to chat with the cybersecurity newsletter editor

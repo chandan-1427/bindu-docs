@@ -1,106 +1,125 @@
-# Long-Running Task Notification System
-
-## Overview
-
-The Long-Running Task Notification System enables real-time webhook notifications for tasks that run longer than typical request timeouts (minutes, hours, or days). This feature allows clients to receive push notifications about task state changes and artifact generation without maintaining persistent connections or polling.
-
-This implementation follows the [A2A Protocol specification](https://a2a-protocol.org/latest/specification/) for push notifications.
-
+---
+title: "Long-Running Task Notification System"
+description: "Real-time webhook notifications for long-running tasks in Bindu"
 ---
 
-## Table of Contents
+Polling works when a task finishes quickly. It gets clumsy when a task runs for minutes, hours, or days and the client still needs to know what happened without keeping a connection open.
 
-- [Features](#features)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Webhook Registration](#webhook-registration)
-- [Notification Events](#notification-events)
-- [Persistence & Server Restarts](#persistence--server-restarts)
-- [Global Webhook Fallback](#global-webhook-fallback)
-- [Security Considerations](#security-considerations)
-- [API Reference](#api-reference)
-- [Examples](#examples)
-- [Troubleshooting](#troubleshooting)
+## Why Notifications Matter
 
----
+The Long-Running Task Notification System gives clients a way to receive webhook notifications for task state changes and artifact generation while the task keeps running in the background. It follows the [A2A Protocol specification](https://a2a-protocol.org/latest/specification/) for push notifications.
 
-## Features
+| Polling long-running tasks | Bindu push notifications |
+| --- | --- |
+| Client must keep asking for task status | Server pushes updates as task state changes |
+| Long-running jobs waste time waiting between polls | Notifications arrive when work actually changes |
+| Artifact delivery depends on another fetch cycle | Artifact events can be sent as soon as they are generated |
+| Server restarts can break the client’s tracking flow | Persisted webhook configs let notifications resume |
+| Every client implements its own workaround | One notification model works across tasks and agents |
 
-✅ **Persistent Webhook Storage** - Webhook configurations survive server restarts  
-✅ **Dual Registration Paths** - Inline (message/send) or separate RPC endpoint  
-✅ **Global Webhook Fallback** - Agent-level default webhook for all tasks  
-✅ **Comprehensive Events** - Status updates and artifact notifications  
-✅ **A2A Protocol Compliant** - Follows official specification  
-✅ **Secure by Design** - Token-based authentication and validation  
+That is the shift: instead of asking the server over and over whether something changed, the client registers a webhook once and gets updates as the task moves forward.
 
----
+<Note>
+This is for tasks that outlive normal request timeouts. If a task may run for minutes, hours, or days, a webhook is usually a better fit than holding the connection open or polling every few seconds.
+</Note>
 
-## Architecture
+## How Bindu Notifications Work
 
-### Components
+The Long-Running Task Notification System enables real-time webhook notifications for tasks that run longer than typical request timeouts. Clients can receive push notifications about task state changes and artifact generation without maintaining persistent connections or polling.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Client Application                    │
-│  ┌────────────────┐              ┌─────────────────────┐   │
-│  │ Task Requester │              │ Webhook Receiver    │   │
-│  └────────┬───────┘              └──────────▲──────────┘   │
-│           │                                  │               │
-└───────────┼──────────────────────────────────┼──────────────┘
-            │                                  │
-            │ 1. POST /messages/send           │ 4. POST webhook
-            │    (with webhook config)         │    (notifications)
-            ▼                                  │
-┌─────────────────────────────────────────────┼──────────────┐
-│                    Bindu Server              │              │
-│  ┌──────────────────────────────────────────┴───────────┐  │
-│  │              MessageHandlers                          │  │
-│  │  • Registers webhook inline                           │  │
-│  │  • Persists if long_running=true                      │  │
-│  └──────────────────┬────────────────────────────────────┘  │
-│                     │                                        │
-│                     │ 2. Schedule task                       │
-│                     ▼                                        │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │              ManifestWorker                           │  │
-│  │  • Executes task                                      │  │
-│  │  • Generates artifacts                                │  │
-│  │  • Calls notification methods                         │  │
-│  └──────────────────┬────────────────────────────────────┘  │
-│                     │                                        │
-│                     │ 3. Notify events                       │
-│                     ▼                                        │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │         PushNotificationManager                       │  │
-│  │  • Manages webhook configs                            │  │
-│  │  • Sends HTTP notifications                           │  │
-│  │  • Handles global fallback                            │  │
-│  └──────────────────┬────────────────────────────────────┘  │
-│                     │                                        │
-│                     │ Persists to                            │
-│                     ▼                                        │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │              Storage (PostgreSQL/Memory)              │  │
-│  │  • Stores webhook configs                             │  │
-│  │  • Survives server restarts                           │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+### The Runtime Model
+
+The system has a few distinct capabilities:
+
+- persistent webhook storage
+- dual registration paths
+- global webhook fallback
+- status and artifact notifications
+- A2A protocol compliance
+- token-based authentication and validation
+
+<CardGroup cols={3}>
+  <Card title="Persistent" icon="globe">
+    Webhook configurations can survive server restarts when `long_running=true`.
+  </Card>
+  <Card title="Flexible" icon="link">
+    Webhooks can be registered inline during task creation or later through a separate RPC endpoint.
+  </Card>
+  <Card title="Practical" icon="shield-check">
+    The system supports task-level webhooks and an agent-level global fallback.
+  </Card>
+</CardGroup>
+
+### The Lifecycle: Registration, Execution, Delivery
+
+Under the hood, every notification-enabled task moves through three practical stages.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Handlers as MessageHandlers
+    participant Worker as ManifestWorker
+    participant Push as PushNotificationManager
+    participant Storage
+    participant Webhook as Webhook Receiver
+
+    Note over Client,Handlers: 1. Registration
+    Client->>Handlers: POST /messages/send or tasks/pushNotification/set
+    Handlers->>Push: Register webhook
+    Push->>Storage: Persist if long_running=true
+
+    Note over Handlers,Worker: 2. Execution
+    Handlers->>Worker: Schedule task
+    Worker->>Worker: Execute task and generate artifacts
+
+    Note over Worker,Webhook: 3. Delivery
+    Worker->>Push: Notify events
+    Push->>Webhook: POST webhook notifications
 ```
 
-### Data Flow
+<Steps>
+  <Step title="Registration">
+    A client creates a task and includes webhook configuration, or registers the webhook later through a dedicated RPC method.
 
-1. **Task Creation**: Client sends task with webhook configuration
-2. **Registration**: MessageHandlers registers webhook (persists if long_running=true)
-3. **Execution**: ManifestWorker executes task
-4. **Notification**: PushNotificationManager sends events to webhook
-5. **Persistence**: Webhook config stored in database for long-running tasks
+    The two supported registration paths are:
+
+    - inline during `messages/send`
+    - separate RPC registration through `tasks/pushNotification/set`
+
+    If `long_running=true`, the webhook configuration is persisted so it survives restarts.
+  </Step>
+
+  <Step title="Execution">
+    Once the task is scheduled, `ManifestWorker` executes it and generates artifacts as usual.
+
+    The notification path does not replace task execution. It sits alongside it:
+
+    1. **Task Creation**: Client sends task with webhook configuration
+    2. **Registration**: MessageHandlers registers webhook (persists if long_running=true)
+    3. **Execution**: ManifestWorker executes task
+    4. **Notification**: PushNotificationManager sends events to webhook
+    5. **Persistence**: Webhook config stored in database for long-running tasks
+  </Step>
+
+  <Step title="Delivery">
+    `PushNotificationManager` sends notification events to the configured webhook URL.
+
+    Those events cover:
+
+    - task status changes
+    - artifact generation
+
+    If the task has no task-specific webhook, the system can fall back to a global webhook configured at the agent level.
+  </Step>
+</Steps>
 
 ---
 
 ## Quick Start
 
-### 1. Enable Push Notifications in Agent Manifest
+Getting a notification-enabled task running takes three pieces: enable the capability, send a task with webhook configuration, and expose a webhook receiver.
+
+### Enable Push Notifications In Agent Manifest
 
 ```python
 from bindu.common.models import AgentManifest
@@ -117,7 +136,7 @@ manifest = AgentManifest(
 )
 ```
 
-### 2. Send Task with Webhook (Inline Registration)
+### Send Task With Webhook
 
 ```python
 import requests
@@ -152,7 +171,7 @@ task = response.json()["result"]
 print(f"Task created: {task['id']}")
 ```
 
-### 3. Implement Webhook Receiver
+### Implement Webhook Receiver
 
 ```python
 from fastapi import FastAPI, Request, Header, HTTPException
@@ -183,130 +202,55 @@ async def handle_task_update(
     return {"status": "received"}
 ```
 
----
+<Note>
+If the agent does not declare `"push_notifications": True`, the rest of the setup does not help. The capability has to be enabled first.
+</Note>
 
-## Configuration
+### Configuration Surfaces
 
-### Agent Manifest Configuration
+<CodeGroup>
+  ```python AgentManifest
+  @dataclass
+  class AgentManifest:
+      # Enable push notifications
+      capabilities: dict = field(default_factory=lambda: {
+          "push_notifications": True
+      })
+      
+      # Global webhook (optional)
+      global_webhook_url: str | None = None
+      global_webhook_token: str | None = None
+  ```
 
-```python
-@dataclass
-class AgentManifest:
-    # Enable push notifications
-    capabilities: dict = field(default_factory=lambda: {
-        "push_notifications": True
-    })
-    
-    # Global webhook (optional)
-    global_webhook_url: str | None = None
-    global_webhook_token: str | None = None
-```
+  ```python MessageSendConfiguration
+  class MessageSendConfiguration(TypedDict):
+      accepted_output_modes: Required[list[str]]
+      blocking: NotRequired[bool]
+      history_length: NotRequired[int]
+      
+      # Push notification configuration
+      push_notification_config: NotRequired[PushNotificationConfig]
+      
+      # Long-running flag (enables persistence)
+      long_running: NotRequired[bool]  # Default: False
+  ```
 
-### Message Send Configuration
-
-```python
-class MessageSendConfiguration(TypedDict):
-    accepted_output_modes: Required[list[str]]
-    blocking: NotRequired[bool]
-    history_length: NotRequired[int]
-    
-    # Push notification configuration
-    push_notification_config: NotRequired[PushNotificationConfig]
-    
-    # Long-running flag (enables persistence)
-    long_running: NotRequired[bool]  # Default: False
-```
-
-### Push Notification Configuration
-
-```python
-class PushNotificationConfig(TypedDict):
-    id: Required[UUID]
-    url: Required[str]  # HTTPS webhook URL
-    token: NotRequired[str]  # Bearer token for authentication
-    authentication: NotRequired[dict]  # Advanced auth schemes
-```
-
----
-
-## Webhook Registration
-
-### Method 1: Inline Registration (Recommended)
-
-Register webhook when creating the task:
-
-```python
-POST /messages/send
-{
-  "params": {
-    "message": {...},
-    "configuration": {
-      "accepted_output_modes": ["application/json"],
-      "long_running": true,
-      "push_notification_config": {
-        "id": "webhook-123",
-        "url": "https://myapp.com/webhook",
-        "token": "secret_token"
-      }
-    }
-  }
-}
-```
-
-**Advantages:**
-- ✅ Single API call
-- ✅ No race conditions
-- ✅ Webhook ready before task starts
-
-### Method 2: Separate RPC Registration
-
-Register webhook after task creation:
-
-```python
-# Step 1: Create task
-POST /messages/send
-{
-  "params": {
-    "message": {...},
-    "configuration": {
-      "accepted_output_modes": ["application/json"]
-    }
-  }
-}
-# Returns: {"result": {"id": "task-123", ...}}
-
-# Step 2: Register webhook
-POST /rpc
-{
-  "jsonrpc": "2.0",
-  "method": "tasks/pushNotification/set",
-  "params": {
-    "id": "task-123",
-    "long_running": true,
-    "push_notification_config": {
-      "id": "webhook-456",
-      "url": "https://myapp.com/webhook",
-      "token": "secret_token"
-    }
-  }
-}
-```
-
-**Advantages:**
-- ✅ Can update webhook mid-task
-- ✅ Useful for dynamic workflows
-
-**Disadvantages:**
-- ⚠️ Two API calls
-- ⚠️ Possible race condition for fast tasks
-
----
+  ```python PushNotificationConfig
+  class PushNotificationConfig(TypedDict):
+      id: Required[UUID]
+      url: Required[str]  # HTTPS webhook URL
+      token: NotRequired[str]  # Bearer token for authentication
+      authentication: NotRequired[dict]  # Advanced auth schemes
+  ```
+</CodeGroup>
 
 ## Notification Events
 
+Notifications are sent as structured webhook events. There are two event shapes in the current system.
+
 ### Status Update Event
 
-Sent when task state changes (submitted → working → completed/failed).
+Sent when task state changes (`submitted` -> `working` -> `completed` / `failed`).
 
 ```json
 {
@@ -324,7 +268,8 @@ Sent when task state changes (submitted → working → completed/failed).
 }
 ```
 
-**Task States:**
+Task states:
+
 - `submitted` - Task created
 - `working` - Task executing
 - `input-required` - Waiting for user input
@@ -335,7 +280,7 @@ Sent when task state changes (submitted → working → completed/failed).
 
 ### Artifact Update Event
 
-Sent when artifacts are generated (currently only on task completion).
+Sent when artifacts are generated. At the moment, that means task completion.
 
 ```json
 {
@@ -358,11 +303,26 @@ Sent when artifacts are generated (currently only on task completion).
 }
 ```
 
----
+<Note>
+Status events tell the client where the task is. Artifact events tell the client what the task produced.
+</Note>
 
-## Persistence & Server Restarts
+### Registration Paths
 
-### How It Works
+<CardGroup cols={2}>
+  <Card title="Inline Registration" icon="code">
+    Recommended. Register the webhook during `messages/send` so it is ready before the task starts.
+  </Card>
+  <Card title="Separate RPC Registration" icon="link">
+    Useful when the webhook must be added or updated after the task already exists.
+  </Card>
+</CardGroup>
+
+## Persistence And Fallback
+
+Persistence and fallback are what make the notification system practical for long-running work instead of only short-lived demos.
+
+### Persistence Across Restarts
 
 When `long_running=true`:
 
@@ -370,7 +330,7 @@ When `long_running=true`:
 2. **Server Restart**: TaskManager loads all persisted configs on startup
 3. **Task Continues**: Notifications resume automatically
 
-### Database Schema
+Database schema:
 
 ```sql
 CREATE TABLE webhook_configs (
@@ -382,26 +342,24 @@ CREATE TABLE webhook_configs (
 );
 ```
 
-### Example Flow
+Example flow:
 
 ```python
 # Before restart
 POST /messages/send (long_running=true)
-→ Task created: task-123
-→ Webhook persisted to database
-→ Server crashes/restarts
+-> Task created: task-123
+-> Webhook persisted to database
+-> Server crashes/restarts
 
 # After restart
-→ TaskManager.initialize() loads webhook for task-123
-→ Task continues executing
-→ Notifications still work! ✅
+-> TaskManager.initialize() loads webhook for task-123
+-> Task continues executing
+-> Notifications still work! ✅
 ```
 
----
+### Global Webhook Fallback
 
-## Global Webhook Fallback
-
-### Configuration
+Configuration:
 
 ```python
 manifest = AgentManifest(
@@ -412,13 +370,13 @@ manifest = AgentManifest(
 )
 ```
 
-### Priority Order
+Priority order:
 
 1. **Task-specific webhook** (highest priority)
 2. **Global webhook** (fallback)
 3. **No webhook** (no notifications)
 
-### Example
+Example:
 
 ```python
 # Task 1: Has explicit webhook
@@ -430,7 +388,7 @@ POST /messages/send
     }
   }
 }
-# → Uses task-specific webhook
+# -> Uses task-specific webhook
 
 # Task 2: No explicit webhook
 POST /messages/send
@@ -439,20 +397,199 @@ POST /messages/send
     "accepted_output_modes": ["application/json"]
   }
 }
-# → Uses global webhook (if configured)
+# -> Uses global webhook (if configured)
 ```
 
----
+## Real-World Use Cases
+
+<AccordionGroup>
+  <Accordion title="Method 1: Inline registration">
+    Register the webhook when creating the task.
+
+    ```python
+    POST /messages/send
+    {
+      "params": {
+        "message": {...},
+        "configuration": {
+          "accepted_output_modes": ["application/json"],
+          "long_running": true,
+          "push_notification_config": {
+            "id": "webhook-123",
+            "url": "https://myapp.com/webhook",
+            "token": "secret_token"
+          }
+        }
+      }
+    }
+    ```
+
+    Advantages:
+
+    - Single API call
+    - No race conditions
+    - Webhook ready before task starts
+  </Accordion>
+
+  <Accordion title="Method 2: Separate RPC registration">
+    Register the webhook after task creation.
+
+    ```python
+    # Step 1: Create task
+    POST /messages/send
+    {
+      "params": {
+        "message": {...},
+        "configuration": {
+          "accepted_output_modes": ["application/json"]
+        }
+      }
+    }
+    # Returns: {"result": {"id": "task-123", ...}}
+
+    # Step 2: Register webhook
+    POST /rpc
+    {
+      "jsonrpc": "2.0",
+      "method": "tasks/pushNotification/set",
+      "params": {
+        "id": "task-123",
+        "long_running": true,
+        "push_notification_config": {
+          "id": "webhook-456",
+          "url": "https://myapp.com/webhook",
+          "token": "secret_token"
+        }
+      }
+    }
+    ```
+
+    Advantages:
+
+    - Can update webhook mid-task
+    - Useful for dynamic workflows
+
+    Disadvantages:
+
+    - Two API calls
+    - Possible race condition for fast tasks
+  </Accordion>
+
+  <Accordion title="Data processing pipeline">
+    ```python
+    import requests
+    from uuid import uuid4
+
+    # Start long-running data processing
+    response = requests.post("http://localhost:3773/messages/send", json={
+        "jsonrpc": "2.0",
+        "id": "req-1",
+        "method": "messages/send",
+        "params": {
+            "message": {
+                "message_id": str(uuid4()),
+                "task_id": str(uuid4()),
+                "context_id": str(uuid4()),
+                "kind": "message",
+                "role": "user",
+                "parts": [{"kind": "text", "text": "Process 1M records from dataset.csv"}]
+            },
+            "configuration": {
+                "accepted_output_modes": ["application/json"],
+                "long_running": True,
+                "push_notification_config": {
+                    "id": str(uuid4()),
+                    "url": "https://myapp.com/webhooks/data-pipeline",
+                    "token": "pipeline_secret_123"
+                }
+            }
+        }
+    })
+
+    task_id = response.json()["result"]["id"]
+    print(f"Data processing started: {task_id}")
+    print("You will receive webhook notifications as processing progresses")
+    ```
+  </Accordion>
+
+  <Accordion title="Mobile app with serverless webhook">
+    ```python
+    # Mobile app sends task
+    POST /messages/send
+    {
+      "configuration": {
+        "long_running": true,
+        "push_notification_config": {
+          "url": "https://us-central1-myapp.cloudfunctions.net/taskWebhook",
+          "token": "mobile_token_456"
+        }
+      }
+    }
+
+    # AWS Lambda / Cloud Function webhook handler
+    def task_webhook(event, context):
+        body = json.loads(event['body'])
+        
+        if body['kind'] == 'status-update' and body['final']:
+            # Send push notification to mobile device
+            send_fcm_notification(
+                device_token=get_device_token(body['task_id']),
+                title="Task Complete",
+                body=f"Your task has finished"
+            )
+        
+        return {'statusCode': 200}
+    ```
+  </Accordion>
+
+  <Accordion title="Multi-tenant with global webhook">
+    ```python
+    # Configure agent with global webhook
+    manifest = AgentManifest(
+        name="Multi-Tenant Processor",
+        capabilities={"push_notifications": True},
+        global_webhook_url="https://api.myplatform.com/webhooks/tasks",
+        global_webhook_token="platform_master_token"
+    )
+
+    # Tenant A: Uses global webhook
+    POST /messages/send
+    {
+      "message": {"parts": [{"text": "Process tenant A data"}]},
+      "configuration": {
+        "accepted_output_modes": ["application/json"]
+      }
+    }
+    # -> Notifications sent to global webhook
+
+    # Tenant B: Uses custom webhook
+    POST /messages/send
+    {
+      "message": {"parts": [{"text": "Process tenant B data"}]},
+      "configuration": {
+        "push_notification_config": {
+          "url": "https://tenantb.com/webhook",
+          "token": "tenant_b_token"
+        }
+      }
+    }
+    # -> Notifications sent to tenant B's webhook
+    ```
+  </Accordion>
+</AccordionGroup>
 
 ## Security Considerations
 
-### Server-Side (Sending Notifications)
+Push notifications are only useful if the sending side and receiving side both treat them as an external interface worth securing.
+
+### Server-Side: Sending Notifications
 
 #### 1. Webhook URL Validation
 
-**Risk**: SSRF attacks, DDoS amplification
+Risk: SSRF attacks, DDoS amplification
 
-**Mitigation**:
+Mitigation:
+
 ```python
 # Validate webhook URLs
 ALLOWED_DOMAINS = ["myapp.com", "trusted-service.com"]
@@ -475,9 +612,9 @@ def validate_webhook_url(url: str) -> bool:
     return True
 ```
 
-#### 2. Authentication to Client Webhook
+#### 2. Authentication To Client Webhook
 
-**Current**: Bearer token in `Authorization` header
+Current: Bearer token in `Authorization` header
 
 ```python
 headers = {
@@ -486,9 +623,9 @@ headers = {
 }
 ```
 
-**Future**: Support for HMAC signatures, JWT, mTLS
+Future: Support for HMAC signatures, JWT, mTLS
 
-### Client-Side (Receiving Notifications)
+### Client-Side: Receiving Notifications
 
 #### 1. Verify Token
 
@@ -542,8 +679,6 @@ except ValidationError as e:
     raise HTTPException(status_code=400, detail=str(e))
 ```
 
----
-
 ## API Reference
 
 ### MessageSendConfiguration
@@ -569,46 +704,39 @@ class PushNotificationConfig(TypedDict):
 
 ### RPC Methods
 
-#### tasks/pushNotification/set
-
-Register or update webhook for a task.
-
-**Request:**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tasks/pushNotification/set",
-  "params": {
-    "id": "task-123",
-    "long_running": true,
-    "push_notification_config": {
-      "id": "webhook-456",
-      "url": "https://myapp.com/webhook",
-      "token": "secret"
+<CodeGroup>
+  ```json tasks/pushNotification/set
+  {
+    "jsonrpc": "2.0",
+    "method": "tasks/pushNotification/set",
+    "params": {
+      "id": "task-123",
+      "long_running": true,
+      "push_notification_config": {
+        "id": "webhook-456",
+        "url": "https://myapp.com/webhook",
+        "token": "secret"
+      }
     }
   }
-}
-```
+  ```
 
-**Response:**
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "id": "task-123",
-    "push_notification_config": {
-      "id": "webhook-456",
-      "url": "https://myapp.com/webhook"
+  ```json Response
+  {
+    "jsonrpc": "2.0",
+    "result": {
+      "id": "task-123",
+      "push_notification_config": {
+        "id": "webhook-456",
+        "url": "https://myapp.com/webhook"
+      }
     }
   }
-}
-```
+  ```
+</CodeGroup>
 
-#### tasks/pushNotification/get
+`tasks/pushNotification/get`
 
-Get webhook configuration for a task.
-
-**Request:**
 ```json
 {
   "jsonrpc": "2.0",
@@ -619,11 +747,8 @@ Get webhook configuration for a task.
 }
 ```
 
-#### tasks/pushNotificationConfig/delete
+`tasks/pushNotificationConfig/delete`
 
-Delete webhook configuration for a task.
-
-**Request:**
 ```json
 {
   "jsonrpc": "2.0",
@@ -634,208 +759,117 @@ Delete webhook configuration for a task.
 }
 ```
 
----
+## Operational Notes
 
-## Examples
+<AccordionGroup>
+  <Accordion title="Troubleshooting: webhook not receiving notifications">
+    Check 1: Push notifications enabled?
 
-### Example 1: Data Processing Pipeline
+    ```python
+    # Verify in agent manifest
+    manifest.capabilities["push_notifications"] == True
+    ```
 
-```python
-import requests
-from uuid import uuid4
+    Check 2: Webhook registered?
 
-# Start long-running data processing
-response = requests.post("http://localhost:3773/messages/send", json={
-    "jsonrpc": "2.0",
-    "id": "req-1",
-    "method": "messages/send",
-    "params": {
-        "message": {
-            "message_id": str(uuid4()),
-            "task_id": str(uuid4()),
-            "context_id": str(uuid4()),
-            "kind": "message",
-            "role": "user",
-            "parts": [{"kind": "text", "text": "Process 1M records from dataset.csv"}]
-        },
-        "configuration": {
-            "accepted_output_modes": ["application/json"],
-            "long_running": True,
-            "push_notification_config": {
-                "id": str(uuid4()),
-                "url": "https://myapp.com/webhooks/data-pipeline",
-                "token": "pipeline_secret_123"
-            }
-        }
+    ```python
+    # Query webhook config
+    GET /rpc
+    {
+      "method": "tasks/pushNotification/get",
+      "params": {"task_id": "task-123"}
     }
-})
+    ```
 
-task_id = response.json()["result"]["id"]
-print(f"Data processing started: {task_id}")
-print("You will receive webhook notifications as processing progresses")
-```
+    Check 3: Webhook URL accessible?
 
-### Example 2: Mobile App with Serverless Webhook
+    ```bash
+    # Test webhook endpoint
+    curl -X POST https://myapp.com/webhook \
+      -H "Authorization: Bearer secret_token" \
+      -H "Content-Type: application/json" \
+      -d '{"test": "event"}'
+    ```
 
-```python
-# Mobile app sends task
-POST /messages/send
-{
-  "configuration": {
-    "long_running": true,
-    "push_notification_config": {
-      "url": "https://us-central1-myapp.cloudfunctions.net/taskWebhook",
-      "token": "mobile_token_456"
+    Check 4: Check server logs
+
+    ```bash
+    # Look for notification delivery errors
+    grep "notification delivery failed" logs/bindu.log
+    grep "webhook" logs/bindu.log
+    ```
+  </Accordion>
+
+  <Accordion title="Troubleshooting: webhooks lost after restart">
+    Problem: `long_running` flag not set
+
+    Solution:
+
+    ```python
+    # Ensure long_running=true for persistence
+    "configuration": {
+        "long_running": True,  # Required!
+        "push_notification_config": {...}
     }
-  }
-}
+    ```
 
-# AWS Lambda / Cloud Function webhook handler
-def task_webhook(event, context):
-    body = json.loads(event['body'])
-    
-    if body['kind'] == 'status-update' and body['final']:
-        # Send push notification to mobile device
-        send_fcm_notification(
-            device_token=get_device_token(body['task_id']),
-            title="Task Complete",
-            body=f"Your task has finished"
-        )
-    
-    return {'statusCode': 200}
-```
+    Verify persistence:
 
-### Example 3: Multi-Tenant with Global Webhook
+    ```sql
+    -- Check database
+    SELECT task_id, config FROM webhook_configs;
+    ```
+  </Accordion>
 
-```python
-# Configure agent with global webhook
-manifest = AgentManifest(
-    name="Multi-Tenant Processor",
-    capabilities={"push_notifications": True},
-    global_webhook_url="https://api.myplatform.com/webhooks/tasks",
-    global_webhook_token="platform_master_token"
-)
+  <Accordion title="Troubleshooting: duplicate notifications">
+    Problem: Webhook receiver not idempotent
 
-# Tenant A: Uses global webhook
-POST /messages/send
-{
-  "message": {"parts": [{"text": "Process tenant A data"}]},
-  "configuration": {
-    "accepted_output_modes": ["application/json"]
-  }
-}
-# → Notifications sent to global webhook
+    Solution: Track `event_id` to deduplicate
 
-# Tenant B: Uses custom webhook
-POST /messages/send
-{
-  "message": {"parts": [{"text": "Process tenant B data"}]},
-  "configuration": {
-    "push_notification_config": {
-      "url": "https://tenantb.com/webhook",
-      "token": "tenant_b_token"
-    }
-  }
-}
-# → Notifications sent to tenant B's webhook
-```
+    ```python
+    processed_events = set()
 
----
+    @app.post("/webhook")
+    async def handle_webhook(request: Request):
+        event = await request.json()
+        event_id = event["event_id"]
+        
+        if event_id in processed_events:
+            return {"status": "duplicate"}
+        
+        processed_events.add(event_id)
+        # Process event...
+    ```
+  </Accordion>
 
-## Troubleshooting
+  <Accordion title="Troubleshooting: authentication failures">
+    Problem: Token mismatch
 
-### Webhook Not Receiving Notifications
+    Solution: Verify token format
 
-**Check 1: Push notifications enabled?**
-```python
-# Verify in agent manifest
-manifest.capabilities["push_notifications"] == True
-```
+    ```python
+    # Server sends
+    Authorization: Bearer secret_token
 
-**Check 2: Webhook registered?**
-```python
-# Query webhook config
-GET /rpc
-{
-  "method": "tasks/pushNotification/get",
-  "params": {"task_id": "task-123"}
-}
-```
-
-**Check 3: Webhook URL accessible?**
-```bash
-# Test webhook endpoint
-curl -X POST https://myapp.com/webhook \
-  -H "Authorization: Bearer secret_token" \
-  -H "Content-Type: application/json" \
-  -d '{"test": "event"}'
-```
-
-**Check 4: Check server logs**
-```bash
-# Look for notification delivery errors
-grep "notification delivery failed" logs/bindu.log
-grep "webhook" logs/bindu.log
-```
-
-### Webhooks Lost After Server Restart
-
-**Problem**: `long_running` flag not set
-
-**Solution**:
-```python
-# Ensure long_running=true for persistence
-"configuration": {
-    "long_running": True,  # Required!
-    "push_notification_config": {...}
-}
-```
-
-**Verify persistence**:
-```sql
--- Check database
-SELECT task_id, config FROM webhook_configs;
-```
-
-### Duplicate Notifications
-
-**Problem**: Webhook receiver not idempotent
-
-**Solution**: Track `event_id` to deduplicate
-```python
-processed_events = set()
-
-@app.post("/webhook")
-async def handle_webhook(request: Request):
-    event = await request.json()
-    event_id = event["event_id"]
-    
-    if event_id in processed_events:
-        return {"status": "duplicate"}
-    
-    processed_events.add(event_id)
-    # Process event...
-```
-
-### Authentication Failures
-
-**Problem**: Token mismatch
-
-**Solution**: Verify token format
-```python
-# Server sends
-Authorization: Bearer secret_token
-
-# Client expects
-if authorization == "Bearer secret_token":
-    # ✅ Match
-```
-
----
+    # Client expects
+    if authorization == "Bearer secret_token":
+        # ✅ Match
+    ```
+  </Accordion>
+</AccordionGroup>
 
 ## Best Practices
 
-### 1. Use long_running for Tasks > 30 seconds
+<CardGroup cols={2}>
+  <Card title="Use long_running for tasks over 30 seconds" icon="shield-check">
+    For short tasks, persistence is often unnecessary. For longer tasks, set `long_running=True` so webhook configuration survives restarts.
+  </Card>
+  <Card title="Prefer a global webhook when the flow is shared" icon="link">
+    If all tasks should report back to the same place, a global webhook reduces per-task setup.
+  </Card>
+</CardGroup>
+
+More concrete guidance:
 
 ```python
 # Short task (< 30s): No persistence needed
@@ -850,8 +884,6 @@ if authorization == "Bearer secret_token":
 }
 ```
 
-### 2. Implement Webhook Retry Logic
-
 ```python
 @app.post("/webhook")
 async def handle_webhook(request: Request):
@@ -864,8 +896,6 @@ async def handle_webhook(request: Request):
         # Return 500 to trigger retry
         raise HTTPException(status_code=500)
 ```
-
-### 3. Use Global Webhook for Simplicity
 
 ```python
 # Instead of configuring webhook per-task
@@ -883,8 +913,6 @@ POST /messages/send
 }
 ```
 
-### 4. Monitor Webhook Delivery
-
 ```python
 # Track delivery metrics
 from prometheus_client import Counter
@@ -900,8 +928,6 @@ except Exception:
     webhook_failure.inc()
 ```
 
-### 5. Secure Webhook URLs
-
 ```python
 # Use HTTPS only
 "url": "https://myapp.com/webhook"  # ✅
@@ -913,13 +939,12 @@ except Exception:
 "url": "https://public.myapp.com/webhook"    # ✅
 ```
 
----
+## Migration And Performance
 
-## Migration Guide
+### From Polling To Push Notifications
 
-### From Polling to Push Notifications
+Before:
 
-**Before (Polling)**:
 ```python
 # Create task
 task = create_task(...)
@@ -932,7 +957,8 @@ while True:
     time.sleep(5)  # Poll every 5 seconds
 ```
 
-**After (Push Notifications)**:
+After:
+
 ```python
 # Create task with webhook
 task = create_task(
@@ -950,45 +976,57 @@ task = create_task(
 # No polling needed!
 ```
 
----
+### Performance Considerations
 
-## Performance Considerations
+- **Webhook Delivery Latency**
+  Target: `< 1 second` from event to webhook delivery
+  Factors: network latency, webhook endpoint response time
+  Optimization: async HTTP client, connection pooling
 
-### Webhook Delivery Latency
+- **Database Load**
+  Webhook configs: loaded once on startup, cached in memory
+  Impact: minimal; only write on registration, read on startup
+  Scaling: supports `10,000+` concurrent long-running tasks
 
-- **Target**: < 1 second from event to webhook delivery
-- **Factors**: Network latency, webhook endpoint response time
-- **Optimization**: Use async HTTP client, connection pooling
+- **Memory Usage**
+  Per webhook config: `~200 bytes`
+  `10,000` webhooks: `~2 MB` memory
+  Impact: negligible on server resources
 
-### Database Load
+## Related
 
-- **Webhook configs**: Loaded once on startup, cached in memory
-- **Impact**: Minimal - only write on registration, read on startup
-- **Scaling**: Supports 10,000+ concurrent long-running tasks
-
-### Memory Usage
-
-- **Per webhook config**: ~200 bytes (in-memory)
-- **10,000 webhooks**: ~2 MB memory
-- **Negligible impact** on server resources
-
----
-
-## References
-
-- [A2A Protocol Specification](https://a2a-protocol.org/latest/specification/)
-- [Push Notifications for Disconnected Scenarios](https://a2a-protocol.org/latest/specification/#push-notifications)
-- [Webhook Security Best Practices](https://webhooks.fyi/security/best-practices)
+* https://a2a-protocol.org/latest/specification/
+* https://a2a-protocol.org/latest/specification/#push-notifications
+* https://webhooks.fyi/security/best-practices
 
 ---
 
 ## Support
 
 For issues or questions:
+
 - GitHub Issues: https://github.com/getbindu/Bindu/issues
-- Documentation: https://docs.bindu.ai
 
 ---
 
 **Last Updated**: December 26, 2025  
 **Version**: 1.0.0
+
+---
+
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+
+  <span className="brand-quote-text">
+    Bindu turns long-running work into{" "}
+    <span className="brand-quote-highlight">
+      something clients can follow without polling
+    </span>
+    , so tasks can keep running while updates keep moving.
+  </span>
+</span>

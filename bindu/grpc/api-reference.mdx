@@ -1,170 +1,212 @@
 ---
-title: 'API Reference'
-description: 'Complete gRPC contract between SDKs and the Bindu core'
+title: "API Reference"
+description: "Complete gRPC contract between SDKs and the Bindu core"
 ---
 
-The complete gRPC contract between SDKs and the Bindu core. Defined in `proto/agent_handler.proto`.
+The complete gRPC contract between SDKs and the Bindu core is defined in `proto/agent_handler.proto`. This contract is what lets SDKs register agents, send heartbeats, expose handler callbacks, and keep the language-agnostic runtime aligned with the Python core.
+
+## Why This API Matters
+
+The gRPC layer is not an add-on around Bindu. It is the contract that keeps registration, liveness, handler execution, and capability discovery consistent across SDKs while the core continues to run the shared infrastructure.
+
+| Ad-hoc SDK integration | Bindu gRPC contract |
+| --- | --- |
+| Each SDK invents its own registration and callback shape | One protocol defines the shared contract between SDKs and the core |
+| Liveness and capability checks vary across languages | Heartbeat, HealthCheck, and GetCapabilities are standardized |
+| Remote handlers can drift from local bindufy behavior | RegisterAgent preserves the same bindufy pipeline in the core |
+| Message execution contracts become SDK-specific | HandleMessages keeps one handler request/response model |
+| Operational behavior becomes harder to debug | Ports, methods, and message schemas stay explicit and testable |
+
+That is the shift: the proto turns the language boundary into a stable interface. SDKs and the core can evolve around one shared contract instead of growing separate integration logic.
+
+<Note>
+The reference here is not just a list of RPCs. It is the runtime boundary that allows remote SDKs to participate in the same bindufy lifecycle as local Python agents.
+</Note>
+
+## How The gRPC Contract Works
+
+The contract is split across two services. `BinduService` lives in the Bindu core and is called by SDKs. `AgentHandler` lives in the SDK and is called by the core when work arrives.
+
+### The Service Split
+
+`BinduService` runs on port `3774` in the Bindu core. SDKs use it to register and manage agents.
+
+`AgentHandler` runs on a dynamic port in the SDK. The core uses it to execute the developer's handler and query runtime status.
+
+<CardGroup cols={3}>
+  <Card title="Registration" icon="link">
+    `BinduService` is the control plane for agent registration, heartbeats, and shutdown.
+  </Card>
+  <Card title="Execution" icon="code">
+    `AgentHandler` is the runtime callback plane for message handling and health checks.
+  </Card>
+  <Card title="Shared Proto" icon="shield-check">
+    Both sides follow the same message schema from `proto/agent_handler.proto`.
+  </Card>
+</CardGroup>
+
+### The Lifecycle: Register, Execute, Maintain
+
+Under the hood, every SDK-to-core interaction moves through three practical stages.
+
+```mermaid
+sequenceDiagram
+    participant SDK
+    participant Core as BinduService (:3774)
+    participant Handler as AgentHandler (dynamic port)
+
+    Note over SDK,Core: 1. Register
+    SDK->>Core: RegisterAgent(config_json, skills, grpc_callback_address)
+    Core-->>SDK: RegisterAgentResponse
+
+    Note over Core,Handler: 2. Execute
+    Core->>Handler: HandleMessages(messages, task_id, context_id)
+    Handler-->>Core: HandleResponse
+
+    Note over SDK,Core: 3. Maintain
+    SDK->>Core: Heartbeat(agent_id, timestamp)
+    Core-->>SDK: HeartbeatResponse
+    SDK->>Core: UnregisterAgent(agent_id)
+    Core-->>SDK: UnregisterAgentResponse
+```
+
+<Steps>
+  <Step title="Register">
+    `RegisterAgent` is the main entry point. The SDK sends config, skills, and its callback address. The core runs the full bindufy pipeline and returns the agent's identity.
+
+    <CodeGroup>
+      ```protobuf Request
+      message RegisterAgentRequest {
+        string config_json = 1;              // Full config as JSON string
+        repeated SkillDefinition skills = 2; // Skills with file content
+        string grpc_callback_address = 3;    // SDK's AgentHandler address
+      }
+      ```
+
+      ```protobuf Response
+      message RegisterAgentResponse {
+        bool success = 1;
+        string agent_id = 2;   // Generated UUID
+        string did = 3;        // "did:bindu:author:name:id"
+        string agent_url = 4;  // "http://localhost:3773"
+        string error = 5;      // Error message if success=false
+      }
+      ```
+    </CodeGroup>
+
+    `config_json` matches the Python `bindufy()` config format:
+
+    ```json
+    {
+      "author": "dev@example.com",
+      "name": "my-agent",
+      "description": "What it does",
+      "deployment": {"url": "http://localhost:3773", "expose": true},
+      "execution_cost": {"amount": "1000000", "token": "USDC"}
+    }
+    ```
+
+    The core validates config, generates agent ID using `SHA256` of `author+name`, creates Ed25519 DID keys, sets up x402 payments, creates the manifest with `GrpcAgentClient` as handler, and starts the HTTP/A2A server on the configured URL.
+  </Step>
+
+  <Step title="Execute">
+    `HandleMessages` is how the core invokes the SDK handler once work arrives.
+
+    <CodeGroup>
+      ```protobuf Request
+      message HandleRequest {
+        repeated ChatMessage messages = 1;  // Conversation history
+        string task_id = 2;
+        string context_id = 3;
+      }
+
+      message ChatMessage {
+        string role = 1;     // "user", "assistant", or "system"
+        string content = 2;
+      }
+      ```
+
+      ```protobuf Response
+      message HandleResponse {
+        string content = 1;                  // The response text
+        string state = 2;                    // "" = completed, "input-required", "auth-required"
+        string prompt = 3;                   // Follow-up prompt (when state is set)
+        bool is_final = 4;                   // Always true (streaming not implemented)
+        map<string, string> metadata = 5;
+      }
+      ```
+    </CodeGroup>
+
+    Response rules:
+
+    - **Normal response:** `{content: "answer", state: ""}` -> task completes
+    - **Need more info:** `{state: "input-required", prompt: "Can you clarify?"}` -> task stays open
+    - **Need auth:** `{state: "auth-required"}` -> task stays open
+    - **Error:** Return gRPC `INTERNAL` status -> task fails
+  </Step>
+
+  <Step title="Maintain">
+    `Heartbeat` and `UnregisterAgent` handle liveness and clean shutdown for SDK-managed agents.
+
+    <CodeGroup>
+      ```protobuf Heartbeat
+      message HeartbeatRequest {
+        string agent_id = 1;
+        int64 timestamp = 2;   // Unix timestamp in milliseconds
+      }
+
+      message HeartbeatResponse {
+        bool acknowledged = 1;      // true if agent_id is registered
+        int64 server_timestamp = 2;
+      }
+      ```
+
+      ```protobuf Shutdown
+      message UnregisterAgentRequest { string agent_id = 1; }
+      message UnregisterAgentResponse { bool success = 1; string error = 2; }
+      ```
+    </CodeGroup>
+
+    SDKs send `Heartbeat` every 30 seconds and call `UnregisterAgent` before exiting.
+  </Step>
+</Steps>
 
 ---
 
-## Services
+## Service Reference
+
+Each service in the proto has a distinct role in the runtime.
 
 ### BinduService (port 3774)
 
 Lives in the Bindu core. SDKs call this to register and manage agents.
 
-#### RegisterAgent
-
-The main entry point. SDK sends config + skills, core runs the full bindufy pipeline and returns the agent's identity.
-
-**Request:**
-```protobuf
-message RegisterAgentRequest {
-  string config_json = 1;             // Full config as JSON string
-  repeated SkillDefinition skills = 2; // Skills with file content
-  string grpc_callback_address = 3;   // SDK's AgentHandler address
-}
-```
-
-`config_json` matches the Python `bindufy()` config format:
-```json
-{
-  "author": "dev@example.com",
-  "name": "my-agent",
-  "description": "What it does",
-  "deployment": {"url": "http://localhost:3773", "expose": true},
-  "execution_cost": {"amount": "1000000", "token": "USDC"}
-}
-```
-
-**Response:**
-```protobuf
-message RegisterAgentResponse {
-  bool success = 1;
-  string agent_id = 2;   // Generated UUID
-  string did = 3;         // "did:bindu:author:name:id"
-  string agent_url = 4;   // "http://localhost:3773"
-  string error = 5;       // Error message if success=false
-}
-```
-
-<Info>
-**What the core does:** validates config, generates agent ID (SHA256 of author+name), creates Ed25519 DID keys, sets up x402 payments, creates manifest with `GrpcAgentClient` as handler, starts HTTP/A2A server on the configured URL.
-</Info>
-
-#### Heartbeat
-
-Keep-alive signal. SDKs send this every 30 seconds.
-
-**Request:**
-```protobuf
-message HeartbeatRequest {
-  string agent_id = 1;
-  int64 timestamp = 2;   // Unix timestamp in milliseconds
-}
-```
-
-**Response:**
-```protobuf
-message HeartbeatResponse {
-  bool acknowledged = 1;      // true if agent_id is registered
-  int64 server_timestamp = 2;
-}
-```
-
-#### UnregisterAgent
-
-Clean shutdown. SDK calls this before exiting.
-
-**Request/Response:**
-```protobuf
-message UnregisterAgentRequest { string agent_id = 1; }
-message UnregisterAgentResponse { bool success = 1; string error = 2; }
-```
-
----
+| Method | What it does |
+| --- | --- |
+| `RegisterAgent` | SDK sends config + skills, core runs the full bindufy pipeline and returns the agent's identity |
+| `Heartbeat` | Keep-alive signal sent every 30 seconds |
+| `UnregisterAgent` | Clean shutdown call before SDK exit |
 
 ### AgentHandler (dynamic port)
 
 Lives in the SDK. The core calls this when work arrives.
 
-#### HandleMessages
-
-The core sends conversation history, the SDK runs the developer's handler and returns the response.
-
-**Request:**
-```protobuf
-message HandleRequest {
-  repeated ChatMessage messages = 1;  // Conversation history
-  string task_id = 2;
-  string context_id = 3;
-}
-
-message ChatMessage {
-  string role = 1;     // "user", "assistant", or "system"
-  string content = 2;
-}
-```
-
-**Response:**
-```protobuf
-message HandleResponse {
-  string content = 1;                  // The response text
-  string state = 2;                    // "" = completed, "input-required", "auth-required"
-  string prompt = 3;                   // Follow-up prompt (when state is set)
-  bool is_final = 4;                   // Always true (streaming not implemented)
-  map<string, string> metadata = 5;
-}
-```
-
-**Response rules:**
-- **Normal response:** `{content: "answer", state: ""}` → task completes
-- **Need more info:** `{state: "input-required", prompt: "Can you clarify?"}` → task stays open
-- **Need auth:** `{state: "auth-required"}` → task stays open
-- **Error:** Return gRPC `INTERNAL` status → task fails
-
-#### HandleMessagesStream
-
-Server-side streaming variant. **Defined in proto but not implemented** in `GrpcAgentClient`.
+| Method | What it does |
+| --- | --- |
+| `HandleMessages` | Core sends conversation history, SDK runs the developer's handler and returns the response |
+| `HandleMessagesStream` | Server-side streaming variant defined in proto but not implemented in `GrpcAgentClient` |
+| `GetCapabilities` | Core queries what the SDK agent supports |
+| `HealthCheck` | Core verifies the SDK is responsive |
 
 <Warning>
-Streaming is not yet implemented. See [limitations](/bindu/grpc/limitations) for details.
+Streaming is not yet implemented. `HandleMessagesStream` is defined in the proto but not implemented in `GrpcAgentClient`. See [gRPC overview](/bindu/grpc/overview) for details.
 </Warning>
-
-#### GetCapabilities
-
-Core queries what the SDK agent supports.
-
-**Response:**
-```protobuf
-message GetCapabilitiesResponse {
-  string name = 1;
-  string description = 2;
-  string version = 3;
-  bool supports_streaming = 4;
-  repeated SkillDefinition skills = 5;
-}
-```
-
-#### HealthCheck
-
-Core verifies the SDK is responsive.
-
-**Response:**
-```protobuf
-message HealthCheckResponse {
-  bool healthy = 1;
-  string message = 2;   // "OK" or diagnostic info
-}
-```
-
----
 
 ## Shared Message Types
 
 ### SkillDefinition
 
-Sent during registration. Carries the skill file content so the core doesn't need filesystem access.
+`SkillDefinition` is sent during registration and carries the skill file content so the core does not need filesystem access.
 
 ```protobuf
 message SkillDefinition {
@@ -180,14 +222,49 @@ message SkillDefinition {
 }
 ```
 
----
+Each field has a specific job:
+
+- `name` identifies the skill
+- `description` explains what the skill does
+- `tags` provides categorical labels
+- `input_modes` declares supported input types
+- `output_modes` declares supported output types
+- `version` records the skill version
+- `author` records who authored the skill
+- `raw_content` carries the full file content
+- `format` declares whether the source was `yaml` or `markdown`
+
+<Note>
+Sending skill content during registration lets the SDK remain the source of truth for skill files while the core receives the exact material it needs to build the manifest.
+</Note>
+
+### Capability And Health Responses
+
+<CodeGroup>
+  ```protobuf GetCapabilitiesResponse
+  message GetCapabilitiesResponse {
+    string name = 1;
+    string description = 2;
+    string version = 3;
+    bool supports_streaming = 4;
+    repeated SkillDefinition skills = 5;
+  }
+  ```
+
+  ```protobuf HealthCheckResponse
+  message HealthCheckResponse {
+    bool healthy = 1;
+    string message = 2;   // "OK" or diagnostic info
+  }
+  ```
+</CodeGroup>
 
 ## Configuration
 
 Environment variables for the gRPC server:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| --- | --- | --- |
 | `GRPC__ENABLED` | `false` | Enable gRPC server |
 | `GRPC__HOST` | `0.0.0.0` | Bind address |
 | `GRPC__PORT` | `3774` | Server port |
@@ -196,23 +273,65 @@ Environment variables for the gRPC server:
 | `GRPC__HANDLER_TIMEOUT` | `30.0` | HandleMessages timeout (seconds) |
 | `GRPC__HEALTH_CHECK_INTERVAL` | `30` | Health check interval (seconds) |
 
+## Practical gRPC Calls
+
+<AccordionGroup>
+  <Accordion title="List services">
+    ```bash
+    grpcurl -plaintext -import-path proto -proto agent_handler.proto localhost:3774 list
+    ```
+  </Accordion>
+
+  <Accordion title="Send Heartbeat">
+    ```bash
+    grpcurl -plaintext -emit-defaults \
+      -proto proto/agent_handler.proto -import-path proto \
+      -d '{"agent_id": "test", "timestamp": 1711234567890}' \
+      localhost:3774 bindu.grpc.BinduService.Heartbeat
+    ```
+  </Accordion>
+
+  <Accordion title="Call RegisterAgent">
+    ```bash
+    grpcurl -plaintext -emit-defaults \
+      -proto proto/agent_handler.proto -import-path proto \
+      -d '{"config_json": "{\"author\":\"test@example.com\",\"name\":\"test\",\"deployment\":{\"url\":\"http://localhost:3773\",\"expose\":true}}", "skills": [], "grpc_callback_address": "localhost:50052"}' \
+      localhost:3774 bindu.grpc.BinduService.RegisterAgent
+    ```
+  </Accordion>
+ </AccordionGroup>
+
+## Operational Guarantees
+
+<CardGroup cols={2}>
+  <Card title="Stable Contract" icon="shield-check">
+    The proto keeps SDK registration, handler execution, and liveness signaling aligned across languages.
+  </Card>
+  <Card title="Explicit Interfaces" icon="link">
+    Ports, message types, and RPC boundaries stay visible and testable with tools like `grpcurl`.
+  </Card>
+</CardGroup>
+
+## Related
+
+* https://www.getbindu.com
+* https://github.com/getbindu/bindu/tree/main/examples
+
 ---
 
-## Testing with grpcurl
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
 
-```bash
-# List services
-grpcurl -plaintext -import-path proto -proto agent_handler.proto localhost:3774 list
-
-# Heartbeat
-grpcurl -plaintext -emit-defaults \
-  -proto proto/agent_handler.proto -import-path proto \
-  -d '{"agent_id": "test", "timestamp": 1711234567890}' \
-  localhost:3774 bindu.grpc.BinduService.Heartbeat
-
-# RegisterAgent
-grpcurl -plaintext -emit-defaults \
-  -proto proto/agent_handler.proto -import-path proto \
-  -d '{"config_json": "{\"author\":\"test@example.com\",\"name\":\"test\",\"deployment\":{\"url\":\"http://localhost:3773\",\"expose\":true}}", "skills": [], "grpc_callback_address": "localhost:50052"}' \
-  localhost:3774 bindu.grpc.BinduService.RegisterAgent
-```
+  <span className="brand-quote-text">
+    Bindu keeps the runtime contract{" "}
+    <span className="brand-quote-highlight">
+      explicit at the boundary
+    </span>
+    , so SDKs and the core can behave like one system across languages.
+  </span>
+</span>

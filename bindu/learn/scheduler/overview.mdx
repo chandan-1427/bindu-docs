@@ -3,11 +3,45 @@ title: "Redis Scheduler"
 description: "Distributed task scheduling for Bindu agents"
 ---
 
+When an agent handles one request at a time, in one process, on one machine, scheduling feels invisible. The moment that agent grows into multiple workers, concurrent jobs, or distributed deployments, invisible scheduling becomes a real systems problem.
+
+Without a scheduler, tasks can pile up in the wrong place, workers can miss work, and scaling becomes guesswork instead of design. The agent may still think clearly, but the path between intention and execution starts to fracture.
+
+## Why Scheduling Matters
+
+Bindu agents need a reliable way to hand work from the API layer to the process that will actually execute it. That handoff has to stay predictable whether you are running a single local process or a fleet of workers across environments.
+
+| In-memory scheduling | Redis scheduling |
+| --- | --- |
+| Best for single-process development | Best for distributed and multi-worker deployments |
+| Queue lives only inside one running process | Queue is shared across workers and processes |
+| Simple and fast for local testing | Durable coordination layer for production scale |
+| Lost when the process stops | Survives across worker restarts and independent consumers |
+| Limited horizontal scaling | Supports distributed task execution cleanly |
+
 Bindu uses Redis as its distributed task scheduler for coordinating work across multiple workers and processes. The scheduler uses Redis lists with blocking operations for efficient task distribution.
 
-**Scheduler is optional** - InMemoryScheduler is used by default for single-process deployments.
+<Note>
+Scheduler is optional. `InMemoryScheduler` is used by default for single-process deployments, while Redis is the path you take when work needs to move across process boundaries.
+</Note>
 
-## Architecture
+## The Task Of The Scheduler
+
+The scheduler has one responsibility that shapes the rest of the runtime: take a task that has been accepted and make sure some worker can pick it up and execute it at the right time.
+
+In practice, that means the scheduler is responsible for:
+
+- receiving tasks from the `TaskManager`
+- queueing them for execution
+- exposing work to workers efficiently
+- supporting operations like cancellation, pause, and resume
+- making the handoff predictable across local and distributed environments
+
+This is the quiet layer that gives motion to the system. The agent decides what to do. The scheduler makes sure that work actually finds a path forward.
+
+## What Actually Happens Behind The Scenes
+
+Let's break the runtime flow down first, then walk through the lifecycle step by step.
 
 ```mermaid
 sequenceDiagram
@@ -68,7 +102,37 @@ sequenceDiagram
     Note over Scheduler: - run_task<br/>- cancel_task<br/>- pause_task<br/>- resume_task
 ```
 
+What this means is simple: once a task is accepted, the scheduler becomes the bridge between acknowledgment and execution. It is the layer that keeps work moving instead of letting it drift.
+
+<Steps>
+  <Step title="Situation: Startup and Worker Readiness">
+    At startup, `TaskManager` initializes the configured scheduler and starts the `ManifestWorker`. The worker then begins listening for tasks.
+
+    This matters because scheduling is not just about queueing work. It is about making sure the system is ready to receive and process work from the first request onward.
+  </Step>
+
+  <Step title="Task: Queue Work Reliably">
+    When a client sends `message/send`, the task is first saved to storage with a `pending` state, then handed to the scheduler through `run_task(params)`.
+
+    If Redis is configured, the scheduler pushes the task into the Redis queue. If memory is configured, the task stays in the in-process stream instead.
+  </Step>
+
+  <Step title="Action: Distribute And Execute">
+    Workers consume queued tasks differently depending on the scheduler type.
+
+    With Redis, workers use blocking list operations such as `BLPOP`, which means they can wait efficiently for work without wasting cycles. With the in-memory scheduler, workers consume directly from the memory stream.
+
+    Once the task is received, the worker updates storage to `working`, executes the handler, and then writes the final task state back to storage as `completed` or `failed`.
+  </Step>
+
+  <Step title="Result: Work That Scales Cleanly">
+    The result is controlled execution. Tasks can be submitted in one place, processed in another, and monitored from anywhere. As the system grows, scheduling remains explicit instead of accidental.
+  </Step>
+</Steps>
+
 ## Configuration
+
+Scheduler configuration is intentionally small. You choose the scheduler type, provide the queue connection when needed, and keep the rest of the agent code unchanged.
 
 ### Environment Variables
 
@@ -83,31 +147,35 @@ SCHEDULER_TYPE=redis
 REDIS_URL=rediss://default:<password>@<host>:<port>
 ```
 
-**Connection String Formats:**
+Connection string formats:
 
 **With password:**
-```
+
+```text
 rediss://default:****@hostname:port
 ```
 
 **Without password (local development):**
-```
+
+```text
 redis://localhost:6379
 ```
 
 **With database number:**
-```
+
+```text
 redis://localhost:6379/0
 ```
 
 **Example:**
+
 ```bash
 REDIS_URL=rediss://default:****@redis-12345.upstash.io:6379
 ```
 
 ### Agent Configuration
 
-No additional configuration needed in your agent code. Scheduler is configured via environment variables:
+No additional configuration is needed in your agent code. Scheduler is configured via environment variables:
 
 ```python
 config = {
@@ -121,11 +189,31 @@ config = {
 bindufy(config, handler)
 ```
 
+That separation is deliberate. Your agent defines behavior. The environment decides how work is distributed.
+
+### Core Scheduler Capabilities
+
+<CardGroup cols={3}>
+  <Card title="Distributed" icon="network-wired">
+    Redis lets multiple workers and processes coordinate against the same queue.
+  </Card>
+  <Card title="Efficient" icon="gauge">
+    Blocking queue operations let workers wait for work without busy polling.
+  </Card>
+  <Card title="Controllable" icon="sliders">
+    The scheduler supports `run_task`, `cancel_task`, `pause_task`, and `resume_task`.
+  </Card>
+</CardGroup>
+
 ## Setting Up Redis
+
+The setup path depends on where you are in the journey. For local work, you want speed and simplicity. For production, you want a shared queue that stays available beyond one machine or one process.
 
 ### Local Development
 
 #### Using Docker (Recommended)
+
+If you want the fastest clean setup, Docker is the shortest path:
 
 ```bash
 # Start Redis container
@@ -139,6 +227,8 @@ export REDIS_URL="redis://localhost:6379"
 ```
 
 #### Using Local Redis
+
+If you already run Redis locally, the flow is straightforward:
 
 ```bash
 # macOS
@@ -157,19 +247,29 @@ export REDIS_URL="redis://localhost:6379"
 
 #### Upstash (Serverless Redis)
 
+If you want a managed, network-accessible queue, Upstash is a clean fit:
+
 1. Create account at [upstash.com](https://upstash.com)
 2. Create a new Redis database
 3. Copy the connection string (TLS enabled)
 4. Set environment variable:
+
    ```bash
    export REDIS_URL="rediss://default:****@xxx.upstash.io:6379"
    ```
 
+The result is the same in both paths: once `REDIS_URL` is in place and `SCHEDULER_TYPE=redis` is enabled, Bindu can coordinate work across more than one worker without changing the agent itself.
+
 ## Switching Between Scheduler Types
+
+One of the strengths of this design is that you can move between local simplicity and distributed coordination without rewriting your agent logic.
 
 ### From Memory to Redis
 
+When your workload starts outgrowing a single process, move the queue into Redis:
+
 1. Set environment variables:
+
    ```bash
    export SCHEDULER_TYPE=redis
    export REDIS_URL="redis://localhost:6379"
@@ -181,7 +281,10 @@ export REDIS_URL="redis://localhost:6379"
 
 ### From Redis to Memory
 
+When you want to simplify back down to a local runtime:
+
 1. Update environment:
+
    ```bash
    export SCHEDULER_TYPE=memory
    # or unset SCHEDULER_TYPE (memory is default)
@@ -190,3 +293,103 @@ export REDIS_URL="redis://localhost:6379"
 2. Restart agent
 
 3. Tasks in Redis queue remain but won't be processed
+
+This tradeoff matters. Memory is lighter. Redis is broader. The right choice depends on whether your work needs to stay inside one running process or move across a wider network of workers.
+
+## The Value Of Explicit Scheduling
+
+Scheduling only matters if it makes task execution more reliable, more observable, and easier to scale.
+
+This design gives you:
+
+- **controlled handoff** - accepted work moves through a defined queue instead of ad hoc process state
+- **clean scaling** - workers can consume from the same queue across processes and machines
+- **operational clarity** - the path from task submission to completion is easier to trace
+
+This is the point of the whole model: as agents grow, the movement of work should stay transparent instead of becoming a hidden source of fragility.
+
+## Real-World Use Cases
+
+<AccordionGroup>
+  <Accordion title="Single-process local development">
+    When you are iterating quickly on one machine, `InMemoryScheduler` keeps the system simple and fast without requiring external infrastructure.
+
+    ```bash
+    export SCHEDULER_TYPE=memory
+    ```
+  </Accordion>
+
+  <Accordion title="Distributed workers in production">
+    When multiple workers need to share the same stream of tasks, Redis becomes the shared coordination layer that prevents work from being trapped inside one process.
+
+    ```bash
+    export SCHEDULER_TYPE=redis
+    export REDIS_URL="rediss://default:****@xxx.upstash.io:6379"
+    ```
+  </Accordion>
+
+  <Accordion title="Queue-backed task execution">
+    If task submission and task execution happen in different runtime boundaries, the scheduler becomes the contract between the two.
+
+    ```python
+    config = {
+        "author": "your.email@example.com",
+        "name": "research_agent",
+        "description": "A research assistant agent",
+        "deployment": {"url": "http://localhost:3773", "expose": True},
+        "skills": ["skills/question-answering", "skills/pdf-processing"],
+    }
+
+    bindufy(config, handler)
+    ```
+  </Accordion>
+
+  <Accordion title="Operational control over long-running work">
+    In systems where work may need to be interrupted or managed, the scheduler's control surface matters as much as the queue itself.
+
+    ```text
+    run_task
+    cancel_task
+    pause_task
+    resume_task
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use TLS In Production" icon="shield-check">
+    Prefer secure Redis connections such as `rediss://...` when the scheduler runs outside local development.
+  </Card>
+  <Card title="Match Scheduler To Scope" icon="route">
+    Use memory for single-process development and Redis only when work truly needs distributed coordination.
+  </Card>
+</CardGroup>
+
+---
+
+## Related
+
+* https://redis.io/
+* https://upstash.com/
+* /bindu/learn/storage/overview
+
+---
+
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+
+  <span className="brand-quote-text">
+    Bindu scheduler keeps agents in sync like sunflowers{" "}
+    <span className="brand-quote-highlight">
+      independent, yet aligned
+    </span>
+    , bringing trust and light to the Internet of Agents.
+  </span>
+</span>

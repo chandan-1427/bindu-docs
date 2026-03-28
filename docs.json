@@ -77,114 +77,85 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Bindu",
+        "tab": "Home",
         "groups": [
           {
-            "group": "Introduction",
+            "group": "Overview",
             "pages": [
-              "bindu/introduction/what-is-bindu",
-              "bindu/introduction/join-the-internet-agents", 
-              "bindu/introduction/key-concepts",
-              "bindu/introduction/getting-help"
+              "index"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Docs",
+        "groups": [
           {
-            "group": "Create Bindu Agent in 2 minutes",
+            "group": "Developer Journey",
             "pages": [
-              "bindu/create-bindu-agent/overview",
-              "bindu/create-bindu-agent/configuration",
-              "bindu/create-bindu-agent/deploy"
-            ]
-          },
-          {
-            "group": "Concepts",
-            "pages": [
-              "bindu/concepts/architecture",
-              "bindu/concepts/protocol",
-              "bindu/concepts/task-first-pattern"
-            ]
-          },
-          {
-            "group": "Skills",
-            "pages": [
-              "bindu/skills/introduction/overview"
-            ]
-          },
-          {
-            "group": "gRPC & Language-Agnostic Agents",
-            "pages": [
-              "bindu/grpc/introduction",
-              "bindu/grpc/architecture",
-              "bindu/grpc/grpc-agent-client",
-              "bindu/grpc/api-reference",
               {
-                "group": "SDKs",
+                "group": "Get Started",
+                "expanded": true,
                 "pages": [
-                  "bindu/grpc/sdks/getting-started",
-                  "bindu/grpc/sdks/typescript",
-                  "bindu/grpc/sdks/building-sdks"
+                  "bindu/introduction/what-is-bindu",
+                  "bindu/introduction/key-concepts",
+                  "bindu/introduction/join-the-internet-agents",
+                  "bindu/how-to/install",
+                  "bindu/create-bindu-agent/overview",
+                  "bindu/create-bindu-agent/configuration",
+                  "bindu/create-bindu-agent/deploy"
                 ]
               },
-              "bindu/grpc/limitations"
-            ]
-          },
-          {
-            "group": "Learn",
-            "pages": [
               {
-                "group": "DID",
+                "group": "Architecture",
                 "pages": [
-                  "bindu/learn/did/overview"
-                ] 
+                  "bindu/concepts/architecture",
+                  "bindu/concepts/task-first-pattern",
+                  "bindu/concepts/protocol"
+                ]
               },
               {
-                "group": "Payment",
+                "group": "The Multi-Language Sidecar",
                 "pages": [
-                  "bindu/learn/payment/introduction"
-                ] 
+                  "bindu/grpc/overview",
+                  "bindu/grpc/quickstart",
+                  "bindu/grpc/agent-client",
+                  "bindu/grpc/custom-sdks",
+                  "bindu/grpc/api-reference"
+                ]
               },
               {
-                "group": "Storage",
+                "group": "Identity & Trust",
                 "pages": [
-                  "bindu/learn/storage/overview"
-                ] 
-              },
-              {
-                "group": "Scheduler",
-                "pages": [
-                  "bindu/learn/scheduler/overview"
-                ] 
-              },
-              {
-                "group": "Authentication",
-                "pages": [
+                  "bindu/learn/did/overview",
                   "bindu/learn/authentication/overview"
                 ]
               },
               {
-                "group": "Observability",
+                "group": "Action & Memory",
                 "pages": [
-                  "bindu/learn/observability/overview"
+                  "bindu/skills/introduction/overview",
+                  "bindu/learn/storage/overview",
+                  "bindu/learn/scheduler/overview"
                 ]
               },
               {
-                "group": "Health Metrics",
+                "group": "The Internet Of Agents",
                 "pages": [
-                  "bindu/learn/health-metrics/overview"
-                ] 
+                  "bindu/learn/tunneling/overview",
+                  "bindu/learn/negotiation/overview",
+                  "bindu/learn/payment/introduction",
+                  "bindu/learn/notification/overview"
+                ]
               },
               {
-                "group": "Negotiation",
+                "group": "Production Reliability",
                 "pages": [
-                  "bindu/learn/negotiation/overview"
-                ] 
+                  "bindu/learn/retry/overview",
+                  "bindu/learn/observability/overview",
+                  "bindu/learn/health-metrics/overview"
+                ]
               }
-            ]
-          },
-          {
-            "group": "How to",
-            "pages": [
-              "bindu/how-to/install"
             ]
           }
         ]

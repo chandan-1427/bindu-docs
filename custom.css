@@ -1,17 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ==========================================================================
    1. GLOBAL VARIABLES (LIGHT MODE DEFAULT)
    ========================================================================== */
 :root {
   /* Typography */
-  --font-family: "Geist", system-ui, -apple-system, sans-serif;
-  --font-mono: "Geist Mono", monospace;
-  --line-height: 1.65;
+  --font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --line-height: 1.7; /* Slightly increased for elegance and readability */
   
   /* Core Theme Colors */
   --text-color: #1f2937; 
-  --text-color-alt: #475569; 
+  --text-color-alt: #64748b; /* Softened slightly for a more subtle look */
   --background-color: #fafafa; 
   --background-color-alt: #f1f5f9; 
   
@@ -70,12 +70,15 @@ body {
   font-family: var(--font-family);
   line-height: var(--line-height);
   color: var(--text-color);
+  -webkit-font-smoothing: antialiased; /* Makes text look razor-sharp on Mac/iOS */
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* Force specific blocks to retain monospace font across the UI */
 code, pre, kbd, .code-block {
   font-family: var(--font-mono) !important;
-  font-size: 0.9em;
+  font-size: 0.95em;
 }
 
 /* Global scroll behavior with top-padding to prevent anchor link overlap */
@@ -102,7 +105,7 @@ html {
   border: 1px solid var(--brand-border-subtle) !important;
   padding: 0.2em 0.4em !important;
   border-radius: 6px !important;
-  font-size: 0.85em !important;
+  font-size: 0.83em !important;
   font-weight: 500;
 }
 
@@ -118,6 +121,26 @@ img, .mermaid {
 
 img:hover {
   box-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+/* Add this class to any image to strip away the global borders, shadows, and margins */
+img.clean-icon,
+html.dark img.clean-icon {
+  border: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  transition: none !important;
+  pointer-events: none !important;
+}
+
+/* Strip away the hover effects too */
+img.clean-icon:hover,
+html.dark img.clean-icon:hover {
+  border: none !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 /* Section dividers: Fades from transparent -> brand color -> transparent */
@@ -202,4 +225,129 @@ blockquote p {
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-hover) !important;
+}
+
+/* ==========================================================================
+   7. MINTLIFY COMPONENT OVERRIDES (CARDS & ICONS)
+   ========================================================================== */
+
+/* Aggressively target SVGs inside card grids and ring wrappers */
+main .grid svg, 
+main [class*="ring-1"] svg,
+.prose .grid svg {
+  width: 20px !important; 
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  color: var(--brand-primary) !important;
+  transition: transform 0.2s ease;
+}
+
+/* Optional: Add a tiny scale effect when hovering over the card */
+main [class*="ring-1"]:hover svg {
+  transform: scale(1.1);
+}
+
+/* The outer flexbox wrapper */
+.brand-quote {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px; /* Translates gap-2.5 */
+}
+
+/* Slightly fade the icon */
+.brand-quote .clean-icon {
+  opacity: 0.9;
+}
+
+/* The main text styling (Light Mode defaults) */
+.brand-quote-text {
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500; /* font-medium */
+  letter-spacing: 0.025em;
+  line-height: 1.625; /* leading-relaxed */
+  color: #374151; /* text-gray-700 */
+}
+
+/* Scale up text on desktop (Translates md:text-base) */
+@media (min-width: 768px) {
+  .brand-quote-text {
+    font-size: 1rem; 
+  }
+}
+
+/* The bolded highlight text (Light Mode) */
+.brand-quote-highlight {
+  font-weight: 600; /* font-semibold */
+  color: #111827; /* text-gray-900 */
+}
+
+/* --- Dark Mode Overrides --- */
+html.dark .brand-quote-text {
+  color: #d1d5db; /* dark:text-gray-300 */
+}
+
+html.dark .brand-quote-highlight {
+  color: #ffffff; /* dark:text-white */
+}
+
+/* ==========================================================================
+   8. TYPOGRAPHY & VISUAL HIERARCHY
+   ========================================================================== */
+
+/* --- 1. The Sidebar Fix --- 
+   Mintlify defaults the sidebar to a very small size. We target the aside/nav 
+   elements to bump the size and add a touch of letter spacing for legibility. */
+aside a, 
+aside button,
+[data-testid="sidebar"] a,
+[data-testid="sidebar"] button {
+  font-size: 0.95rem !important; 
+  letter-spacing: 0.01em;
+}
+
+/* --- 2. Main Content Base Text --- 
+   Targeting .prose ensures we only affect the markdown content area, 
+   leaving UI elements alone. */
+.prose p, 
+.prose ul, 
+.prose ol, 
+.prose li {
+  font-size: 1.05rem !important; /* Bumps base reading size up from 16px */
+  line-height: 1.75 !important;  /* Gives the text room to breathe */
+}
+
+/* --- 3. Heading Hierarchy --- 
+   Creates distinct size and weight differences so the page is highly scannable. */
+
+.prose h1 {
+  font-size: 2.0rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important; /* Tighter tracking for large headers */
+  margin-bottom: 1.5rem !important;
+}
+
+.prose h2 {
+  font-size: 1.35rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  margin-top: 3rem !important; /* Extra space above H2s to chunk sections */
+  margin-bottom: 1rem !important;
+}
+
+.prose h3 {
+  font-size: 1.15rem !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  margin-top: 2rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Slight bump for inline code inside standard text so it doesn't look dwarfed 
+   now that the base paragraph size is larger */
+.prose p > code, 
+.prose li > code {
+  font-size: 0.9em !important;
 }

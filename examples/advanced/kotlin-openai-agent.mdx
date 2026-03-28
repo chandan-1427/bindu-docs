@@ -74,7 +74,7 @@ fun main() {
                 "cors_origins" to listOf("http://localhost:5173")
             ),
         ),
-        skills = listOf("skills/question-answering")
+        skills = listOf("skills/kotlin-openai-skill")
     ) { messages ->
         // Call OpenAI and return the response
         callOpenAI(messages)
@@ -82,6 +82,138 @@ fun main() {
 }
 ```
 
+
+
+## Skill Configuration
+
+Create `skills/kotlin-openai-skill/skill.yaml`:
+
+```yaml
+# Kotlin OpenAI Agent Skill
+# Kotlin-based AI agent using OpenAI API integration
+
+id: kotlin-openai-skill
+name: Kotlin OpenAI Agent Skill
+version: 1.0.0
+author: kotlin-developer@example.com
+
+description: |
+  Kotlin agent that demonstrates Bindu SDK integration with OpenAI API.
+  Built with modern Kotlin practices and coroutines for async operations.
+
+  Features:
+  - Direct OpenAI API integration
+  - Kotlin coroutines for async operations
+  - Type-safe message handling
+  - JSON-RPC 2.0 protocol compliance
+  - CORS-enabled for frontend integration
+
+tags:
+  - kotlin
+  - openai
+  - api-integration
+  - async
+  - coroutines
+  - bindu-sdk
+  - microservice
+
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+
+examples:
+  - "Explain the benefits of using Kotlin for backend development"
+  - "What are the key features of Kotlin coroutines?"
+  - "How do I integrate OpenAI API with Kotlin applications?"
+  - "Create a Kotlin function that processes user input"
+  - "What are the best practices for async programming in Kotlin?"
+
+capabilities_detail:
+  openai_integration:
+    supported: true
+    description: "Direct integration with OpenAI GPT models"
+    models_supported: ["gpt-4o", "gpt-4o-mini"]
+  
+  async_operations:
+    supported: true
+    description: "Kotlin coroutines for non-blocking operations"
+    features:
+      - suspend_functions
+      - structured_concurrency
+      - exception_handling
+
+  bindu_sdk:
+    supported: true
+    description: "Full Bindu SDK integration for protocol compliance"
+    features:
+      - did_support
+      - x402_payments
+      - a2a_protocol
+      - cors_enabled
+
+  type_safety:
+    supported: true
+    description: "Kotlin's type system for safe API interactions"
+    features:
+      - null_safety
+      - type_inference
+      - data_classes
+
+requirements:
+  packages:
+    - "com.getbindu:sdk:kotlin"
+    - "com.google.code.gson:gson:2.10.1"
+  system:
+    - java_17_or_higher
+    - gradle_7_or_higher
+  api_keys:
+    - OPENAI_API_KEY
+
+performance:
+  avg_response_time_ms: 2000
+  max_concurrent_requests: 10
+  memory_usage_mb: 128
+  scalability: vertical
+
+assessment:
+  keywords:
+    - kotlin
+    - openai
+    - api
+    - async
+    - coroutines
+    - bindu
+    - microservice
+    - gradle
+
+  specializations:
+    - domain: kotlin-development
+      confidence_boost: 0.4
+    - domain: openai-integration
+      confidence_boost: 0.5
+    - domain: async-programming
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "blocking operations"
+    - "callback hell"
+    - "manual thread management"
+    - "unsafe type casting"
+
+  complexity_indicators:
+    simple:
+      - "explain"
+      - "describe"
+      - "what is"
+    medium:
+      - "how to integrate"
+      - "best practices for"
+    complex:
+      - "create function that"
+      - "implement system that"
+      - "design architecture for"
+```
 ## How It Works
 
 **Kotlin SDK Integration**
@@ -102,23 +234,20 @@ fun main() {
 - Suspended function for async API calls
 - Direct content return to Bindu
 
-**Configuration**
-- Environment-based API key management
-- Standard Bindu deployment configuration
-- CORS origins for frontend integration
-- Skills declaration for capabilities
-
-## Run
+## Dependencies
 
 ```bash
-./gradlew run
+# Create new Kotlin project
+gradle init --type kotlin-application
+
+# Add dependencies
+echo 'dependencies {
+    implementation("com.getbindu:sdk:kotlin")
+    implementation("com.google.code.gson:gson:2.10.1")
+}' >> build.gradle.kts
+
+# Or use existing project with Gradle
 ```
-
-Try: "Explain the benefits of using Kotlin for backend development"
-
-Go to frontend and run npm run dev
-
-Open http://localhost:5173 and try to chat with the Kotlin OpenAI agent
 
 ## Environment Setup
 
@@ -136,3 +265,79 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 }
 ```
+
+## Run
+
+```bash
+./gradlew run
+```
+
+**Examples:**
+
+- "Explain the benefits of using Kotlin for backend development"
+- "What are the key features of Kotlin coroutines?"
+- "How do I integrate OpenAI API with Kotlin applications?"
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Explain the benefits of using Kotlin for backend development"
+        }
+      ]
+    },
+     "skillId": "kotlin-openai-skill",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the Kotlin OpenAI agent

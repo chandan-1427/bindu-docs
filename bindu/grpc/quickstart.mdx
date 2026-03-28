@@ -1,27 +1,36 @@
 ---
-title: 'Getting Started with TypeScript'
-description: 'Step-by-step guide to bindufying your first TypeScript agent'
+title: 'gRPC Quickstart'
+description: 'The fastest path to your first working gRPC agent'
 ---
 
 ## Overview
 
-This guide walks you through creating your first TypeScript agent with Bindu. You'll build a simple OpenAI-powered assistant and transform it into a full A2A-compliant microservice with one `bindufy()` call.
+This is the fastest path to the **aha moment**. You will build a simple TypeScript agent, call `bindufy()`, and watch the Bindu Core sidecar turn it into a real microservice.
 
-**What you'll get:**
-- DID identity
-- A2A protocol compliance
-- x402 payment support
-- Task scheduling and storage
-- Authentication ready
-- Production-ready HTTP server
+You write the **driver**. The sidecar brings the **engine**: DID identity, A2A protocol compliance, x402 payment support, scheduling, storage, and an HTTP server.
 
 **Time to complete:** ~10 minutes
+
+<CardGroup cols={2}>
+  <Card title="DID Identity" icon="fingerprint">
+    The core generates and manages agent identity for you.
+  </Card>
+  <Card title="A2A Protocol" icon="globe">
+    Your handler is exposed as a production-ready A2A service.
+  </Card>
+  <Card title="Payments" icon="credit-card">
+    x402 support can be added without changing the transport model.
+  </Card>
+  <Card title="Scheduling + Storage" icon="database">
+    The sidecar handles task orchestration and persistence.
+  </Card>
+</CardGroup>
 
 ---
 
 ## Prerequisites
 
-Before you begin, make sure you have:
+Before you start, make sure the local machine can run both halves of the sidecar model.
 
 <CardGroup cols={2}>
   <Card title="Node.js" icon="node-js">
@@ -40,7 +49,7 @@ Before you begin, make sure you have:
 
 ### Install Bindu Python Core
 
-The TypeScript SDK requires the Bindu Python core to be installed:
+The TypeScript SDK needs the Bindu Core installed on the machine:
 
 ```bash
 pip install bindu
@@ -49,23 +58,18 @@ uv pip install bindu
 ```
 
 <Info>
-The SDK automatically launches the Python core as a background process — you never start it manually.
+The SDK launches the Python core automatically as a child process. You never start the sidecar manually during normal SDK use.
 </Info>
 
 ---
 
 ## Step 1: Create Your Project
 
-Create a new directory for your agent:
+Start with a clean project directory:
 
 ```bash
 mkdir my-first-agent
 cd my-first-agent
-```
-
-Initialize a new Node.js project:
-
-```bash
 npm init -y
 ```
 
@@ -73,19 +77,19 @@ npm init -y
 
 ## Step 2: Install Dependencies
 
-Install the Bindu SDK and OpenAI SDK:
+Next, install the SDK and your app dependencies.
 
 ```bash
 npm install @bindu/sdk openai dotenv
-npm install -D tsx typescript
+npm install -D tsx typescript @types/node
 ```
 
 **What each package does:**
-- `@bindu/sdk` — Bindu TypeScript SDK (handles gRPC, registration, etc.)
-- `openai` — OpenAI Node.js SDK
-- `dotenv` — Loads environment variables from `.env`
-- `tsx` — TypeScript executor (dev dependency)
-- `typescript` — TypeScript compiler (dev dependency)
+- `@bindu/sdk` - Bindu TypeScript SDK (gRPC, registration, sidecar lifecycle)
+- `openai` - OpenAI Node.js SDK
+- `dotenv` - Loads environment variables from `.env`
+- `tsx` - TypeScript executor (dev dependency)
+- `typescript` - TypeScript compiler (dev dependency)
 
 ---
 
@@ -115,7 +119,7 @@ echo ".env" >> .gitignore
 
 ## Step 4: Create a Skill Definition
 
-Skills define what your agent can do. Create a skills directory:
+Now give the sidecar something structured to advertise.
 
 ```bash
 mkdir -p skills/question-answering
@@ -146,7 +150,7 @@ You can also use Markdown format (`SKILL.md`) instead of YAML. Both formats are 
 
 ## Step 5: Write Your Agent Code
 
-Create `index.ts` in your project root:
+Here is the minimal pattern: your code defines the **driver**, and `bindufy()` attaches the **engine**.
 
 ```typescript
 import { bindufy, ChatMessage } from "@bindu/sdk";
@@ -161,7 +165,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Bindufy your agent — one call, full microservice
+// Bindufy your agent - one call, full microservice
 bindufy(
   {
     // Required: Agent identity
@@ -181,9 +185,6 @@ bindufy(
     skills: ["skills/question-answering"],
   },
   async (messages: ChatMessage[]) => {
-    // This handler is called every time a message arrives via A2A
-    // messages = [{role: "user", content: "..."}, {role: "assistant", content: "..."}, ...]
-
     const response = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o",
       messages: messages.map((m) => ({
@@ -201,7 +202,7 @@ bindufy(
 
 ## Step 6: Run Your Agent
 
-Start your agent:
+Start the app:
 
 ```bash
 npx tsx index.ts
@@ -209,7 +210,7 @@ npx tsx index.ts
 
 You should see output like this:
 
-```
+```text
 [Bindu SDK] Starting Bindu core...
 [Bindu SDK] Bindu core is ready on :3774
 [Bindu SDK] AgentHandler gRPC server started on :50052
@@ -223,13 +224,13 @@ You should see output like this:
 [Bindu SDK] Waiting for messages...
 ```
 
-<Check>Your agent is now running as a full microservice!</Check>
+<Check>Your agent is now running as a full microservice.</Check>
 
 ---
 
-## Step 7: Test Your Agent
+## Step 7: Verify It Works
 
-Open a **new terminal** and test your agent with curl:
+With the sidecar running, verify the public surface.
 
 ### Send a message
 
@@ -243,9 +244,9 @@ curl -s -X POST http://localhost:3773 \
       "message": {
         "role": "user",
         "parts": [{"kind": "text", "text": "What is the capital of France?"}],
-        "messageId": "msg-001",
-        "contextId": "ctx-001",
-        "taskId": "task-001",
+        "messageId": "11111111-1111-1111-1111-111111111111",
+        "contextId": "22222222-2222-2222-2222-222222222222",
+        "taskId": "33333333-3333-3333-3333-333333333333",
         "kind": "message"
       },
       "configuration": {
@@ -253,7 +254,7 @@ curl -s -X POST http://localhost:3773 \
         "blocking": true
       }
     },
-    "id": "test-1"
+    "id": "11111111-1111-1111-1111-111111111111"
   }' | python3 -m json.tool
 ```
 
@@ -275,7 +276,7 @@ curl -s http://localhost:3773/health
 
 ## What Just Happened?
 
-When you called `bindufy()`, the SDK:
+Now that the agent is working, here is the sequence the SDK handled for you.
 
 <Steps>
   <Step title="Launched the Python core">
@@ -311,21 +312,23 @@ When you called `bindufy()`, the SDK:
   </Step>
 </Steps>
 
+In other words, your code became the **driver**, and the sidecar brought the **engine** online around it.
+
 ---
 
 ## Understanding the Message Flow
 
-When a client sends a message to your agent:
+Once startup is done, every request follows the same path:
 
-```
-1. Client → HTTP POST to :3773 (A2A protocol)
+```text
+1. Client -> HTTP POST to :3773 (A2A protocol)
 2. Bindu Core receives request
 3. TaskManager creates task, Scheduler queues it
 4. ManifestWorker picks up task, builds message history
 5. Worker calls manifest.run(messages)
-   └── This is GrpcAgentClient — makes gRPC call to your TypeScript process
+   -> This is GrpcAgentClient - makes gRPC call to your TypeScript process
 6. TypeScript SDK receives HandleMessages on :50052
-7. SDK calls your handler(messages) — the async function you wrote
+7. SDK calls your handler(messages) - the async function you wrote
 8. Your handler calls OpenAI GPT-4o API
 9. OpenAI returns response
 10. SDK sends response back over gRPC
@@ -341,36 +344,38 @@ The gRPC overhead is ~1-5ms. The rest is the LLM call time.
 
 ## Project Structure
 
-Your project should now look like this:
+At this point, your project should look like this:
 
-```
+```text
 my-first-agent/
-├── index.ts                    # Your agent code
-├── package.json                # Dependencies
-├── .env                        # Environment variables (git-ignored)
-├── .gitignore                  # Git ignore file
-├── skills/
-│   └── question-answering/
-│       └── skill.yaml          # Skill definition
-└── node_modules/               # Installed packages
+|-- index.ts
+|-- package.json
+|-- .env
+|-- .gitignore
+|-- skills/
+|   `-- question-answering/
+|       `-- skill.yaml
+`-- node_modules/
 ```
 
 ---
 
 ## Next Steps
 
+The quickstart proves the sidecar works. The next step is learning how to drive it well.
+
 <CardGroup cols={2}>
-  <Card title="Add Multi-Turn Conversations" icon="messages" href="#multi-turn-conversations">
-    Learn how to handle follow-up questions
+  <Card title="Agent Implementation" icon="messages" href="/bindu/grpc/agent-client">
+    Learn how handlers, state transitions, skills, and debugging work
   </Card>
-  <Card title="Add Payments" icon="credit-card" href="#adding-payments">
-    Enable x402 payment requirements
+  <Card title="Custom SDKs" icon="code" href="/bindu/grpc/custom-sdks">
+    Build SDKs for other languages
   </Card>
-  <Card title="Use LangChain" icon="link" href="#using-langchain">
-    Switch to LangChain.js framework
+  <Card title="API Reference" icon="book" href="/bindu/grpc/api-reference">
+    Review services, messages, ports, and env vars
   </Card>
-  <Card title="Deploy to Production" icon="rocket" href="#production-deployment">
-    Deploy your agent to the cloud
+  <Card title="Overview" icon="diagram-project" href="/bindu/grpc/overview">
+    Revisit the sidecar architecture and limitations
   </Card>
 </CardGroup>
 
@@ -378,20 +383,17 @@ my-first-agent/
 
 ## Multi-Turn Conversations
 
-Sometimes your agent needs more information before answering. Return a state transition:
+One of the first useful patterns is keeping the task open when the driver needs more context.
 
 ```typescript
 bindufy(config, async (messages: ChatMessage[]) => {
   if (messages.length === 1) {
-    // First message — ask for clarification
     return {
       state: "input-required",
       prompt: "Could you be more specific about what you're looking for?"
     };
   }
 
-  // Follow-up message — now we have enough context
-  const lastMessage = messages[messages.length - 1].content;
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: messages.map((m) => ({
@@ -410,7 +412,7 @@ The task stays open after `input-required`. When the user sends a follow-up, you
 
 ## Adding Payments
 
-Require payment before your agent executes:
+The same sidecar can also enforce payment before your handler runs:
 
 ```typescript
 bindufy(
@@ -418,17 +420,14 @@ bindufy(
     author: "dev@example.com",
     name: "premium-agent",
     deployment: { url: "http://localhost:3773", expose: true },
-    
-    // x402 payment configuration
     execution_cost: {
-      amount: "1000000",        // 1 USDC (6 decimals)
+      amount: "1000000",
       token: "USDC",
       network: "base-sepolia",
       pay_to_address: "0xYourWalletAddress",
     },
   },
   async (messages) => {
-    // This handler only runs AFTER payment is verified
     return "Premium response!";
   }
 );
@@ -438,13 +437,11 @@ bindufy(
 
 ## Using LangChain
 
-Switch to LangChain.js instead of the OpenAI SDK:
+If the driver changes frameworks, the sidecar does not care.
 
 ```bash
 npm install @langchain/openai
 ```
-
-Update your handler:
 
 ```typescript
 import { ChatOpenAI } from "@langchain/openai";
@@ -458,7 +455,7 @@ bindufy(config, async (messages: ChatMessage[]) => {
       content: m.content,
     }))
   );
-  
+
   return typeof response.content === "string"
     ? response.content
     : JSON.stringify(response.content);
@@ -469,51 +466,29 @@ bindufy(config, async (messages: ChatMessage[]) => {
 
 ## Production Deployment
 
-### Environment Variables
-
-For production, set these environment variables:
+When you move beyond local testing, you still keep the same driver/sidecar split.
 
 ```env
-# Required
 OPENAI_API_KEY=sk-prod-...
-
-# Storage (use PostgreSQL in production)
 STORAGE_TYPE=postgres
 DATABASE_URL=postgresql://user:pass@host/db
-
-# Scheduler (use Redis in production)
 SCHEDULER_TYPE=redis
 REDIS_URL=redis://host:6379
-
-# Deployment
 DEPLOYMENT__URL=https://your-agent.example.com
 DEPLOYMENT__EXPOSE=true
 ```
 
-### Docker Deployment
-
-Create a `Dockerfile`:
-
 ```dockerfile
 FROM node:18-alpine
-
-# Install Python and Bindu
 RUN apk add --no-cache python3 py3-pip
 RUN pip3 install bindu
-
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm ci --production
-
 COPY . .
-
 EXPOSE 3773 3774
-
 CMD ["npx", "tsx", "index.ts"]
 ```
-
-Build and run:
 
 ```bash
 docker build -t my-agent .
@@ -526,29 +501,18 @@ docker run -p 3773:3773 -p 3774:3774 --env-file .env my-agent
 
 ### "Bindu not found"
 
-Install the Python package:
-
 ```bash
 pip install bindu
-```
-
-Verify it's installed:
-
-```bash
 bindu --version
 ```
 
 ### "Port 3773 already in use"
-
-Kill existing processes:
 
 ```bash
 lsof -ti:3773 -ti:3774 | xargs kill 2>/dev/null
 ```
 
 ### "OPENAI_API_KEY not set"
-
-Make sure your `.env` file exists and has a valid key:
 
 ```bash
 cat .env
@@ -557,7 +521,7 @@ cat .env
 
 ### Agent starts but no response
 
-Check the terminal for error logs. Common issues:
+Common issues:
 - Invalid API key
 - Model not available on your OpenAI plan
 - Rate limiting
@@ -565,7 +529,7 @@ Check the terminal for error logs. Common issues:
 
 ### "Registration failed"
 
-The core rejected your config. Check the `[bindu-core]` log lines for details. Common causes:
+Common causes:
 - Missing `author` or `name` in config
 - Invalid `deployment.url` format
 - Port conflicts
@@ -587,8 +551,6 @@ The handler port (`:50052`) is auto-assigned by default. You can override it wit
 ---
 
 ## Complete Example
-
-Here's the complete working example from this guide:
 
 ```typescript
 import { bindufy, ChatMessage } from "@bindu/sdk";
@@ -630,32 +592,18 @@ bindufy(
 
 ---
 
-## What You've Learned
-
-<Check>How to install and set up the Bindu TypeScript SDK</Check>
-<Check>How to create a skill definition</Check>
-<Check>How to write a handler function</Check>
-<Check>How to call bindufy() to create a microservice</Check>
-<Check>How to test your agent with curl</Check>
-<Check>How the message flow works internally</Check>
-<Check>How to add multi-turn conversations</Check>
-<Check>How to add payment requirements</Check>
-
----
-
-## Additional Resources
-
-<CardGroup cols={2}>
-  <Card title="TypeScript SDK Reference" icon="book" href="/bindu/grpc/sdks/typescript">
-    Complete API documentation
-  </Card>
-  <Card title="Architecture Deep Dive" icon="diagram-project" href="/bindu/grpc/architecture">
-    How gRPC agents work internally
-  </Card>
-  <Card title="Example: LangChain Agent" icon="link" href="https://github.com/getbindu/bindu/tree/main/examples/typescript-langchain-agent">
-    Full LangChain.js example
-  </Card>
-  <Card title="Building SDKs" icon="code" href="/bindu/grpc/sdks/building-sdks">
-    Create SDKs for other languages
-  </Card>
-</CardGroup>
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+  <span className="brand-quote-text">
+    Get your first language-agnostic agent running in minutes without writing{" "}
+    <span className="brand-quote-highlight">
+      a single line of infrastructure code
+    </span>
+    .
+  </span>
+</span>

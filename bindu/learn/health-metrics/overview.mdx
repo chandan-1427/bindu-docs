@@ -3,90 +3,241 @@ title: "Health Check & Metrics"
 description: "Monitor agent health and performance"
 ---
 
+When an agent is live, silence is not the same as health. A process may still be running while its dependencies are failing, its task manager is stalled, or its readiness has quietly degraded.
+
+Without health and metrics endpoints, you are left inferring the state of the system from symptoms. Requests time out. Alerts arrive late. Small issues stay hidden until they become production incidents.
+
+## Why Health And Metrics Matter
+
+An agent does not just need to be online. It needs to be ready, observable, and measurable while it works.
+
+| No health instrumentation | Bindu health and metrics |
+| --- | --- |
+| Hard to tell if the process is actually ready | Explicit readiness and runtime state |
+| Failures surface only through user-facing symptoms | Health endpoint exposes system condition early |
+| Limited insight into request behavior | Metrics reveal traffic, latency, and task load |
+| Harder to automate monitoring | Prometheus-friendly output fits existing tooling |
+| Debugging starts too late | Visibility begins from the first request |
+
+That is the shift: Bindu exposes simple operational signals so developers and platforms can understand whether an agent is alive, ready, and performing as expected.
+
+<Note>
+If an agent is accepting requests but cannot actually process them safely, a plain process heartbeat is not enough. You need visibility into readiness, runtime dependencies, and traffic behavior.
+</Note>
+
+## How Health And Metrics Work
+
 Monitor your agent's health and performance with built-in endpoints.
 
-## Health Check
+### The Monitoring Model
 
-Check if your agent is running and ready:
+Bindu exposes two complementary views:
 
-```bash
-curl http://localhost:3773/health
+```text
+/health -> current runtime state
+/metrics -> time-series operational signals
 ```
 
-**Response:**
-```json
-{
-    "status": "ok",
-    "ready": true,
-    "uptime_seconds": 37.56,
-    "version": "2026.6.7.dev65+g6742cd6eb.d20260210",
-    "health": "healthy",
-    "runtime": {
+They solve different problems:
+
+- **health** answers "is this agent ready right now?"
+- **metrics** answer "how has this agent been behaving over time?"
+
+<CardGroup cols={3}>
+  <Card title="Readable" icon="heartbeat">
+    Health responses expose runtime, application, and system state in one place.
+  </Card>
+  <Card title="Queryable" icon="chart-line">
+    Metrics can be scraped by Prometheus-compatible systems for long-term monitoring.
+  </Card>
+  <Card title="Operational" icon="shield-check">
+    Together they help teams detect readiness issues and performance drift early.
+  </Card>
+</CardGroup>
+
+### The Lifecycle: Check, Inspect, Measure
+
+This is the practical flow for monitoring an agent in production.
+
+<Steps>
+  <Step title="Check Health">
+    The health endpoint answers the simplest operational question first: is the agent running and ready?
+
+    <CodeGroup>
+      ```bash Request
+      curl http://localhost:3773/health
+      ```
+
+      ```json Response
+      {
+          "status": "ok",
+          "ready": true,
+          "uptime_seconds": 37.56,
+          "version": "2026.6.7.dev65+g6742cd6eb.d20260210",
+          "health": "healthy",
+          "runtime": {
+              "storage_backend": "PostgresStorage",
+              "scheduler_backend": "RedisScheduler",
+              "task_manager_running": true,
+              "strict_ready": true
+          },
+          "application": {
+              "penguin_id": "<penguin_id>",
+              "agent_did": "<agent_did>"
+          },
+          "system": {
+              "python_version": "<python_version>",
+              "platform": "<platform>",
+              "platform_release": "<platform_release>",
+              "environment": "<environment>"
+          }
+      }
+      ```
+    </CodeGroup>
+
+    The response fields tell you:
+
+    - `status` - Overall health status (`ok` or `error`)
+    - `ready` - Whether agent is ready to accept requests
+    - `uptime_seconds` - Time since agent started
+    - `version` - Bindu version number
+    - `health` - Health status (`healthy` or `unhealthy`)
+    - `runtime` - Runtime information:
+      `storage_backend` - Storage backend type (e.g., `PostgresStorage`)
+      `scheduler_backend` - Scheduler backend type (e.g., `RedisScheduler`)
+      `task_manager_running` - Whether task manager is running
+      `strict_ready` - Strict readiness check status
+    - `application` - Application information:
+      `penguin_id` - Unique penguin identifier
+      `agent_did` - Agent's DID (Decentralized Identifier)
+    - `system` - System information:
+      `python_version` - Python version
+      `platform` - Operating system platform
+      `platform_release` - OS release version
+      `environment` - Deployment environment
+  </Step>
+
+  <Step title="Inspect Runtime State">
+    The health response is not just a liveness check. It exposes enough context to tell whether the agent is actually safe to receive work.
+
+    This matters because readiness is often a dependency question. If storage, scheduling, or the task manager is degraded, the agent may be present but not truly ready.
+  </Step>
+
+  <Step title="Measure Ongoing Behavior">
+    The metrics endpoint exposes Prometheus-compatible time-series data so you can watch traffic, latency, concurrency, and active task load over time.
+
+    <CodeGroup>
+      ```bash Request
+      curl http://localhost:3773/metrics
+      ```
+
+      ```prometheus Response
+      # HELP http_requests_total Total number of HTTP requests
+      # TYPE http_requests_total counter
+      http_requests_total{method="GET",endpoint="/health",status="200"} 1
+
+      # HELP agent_tasks_active Currently active tasks
+      # TYPE agent_tasks_active gauge
+      agent_tasks_active{agent_id="did:bindu:..."} 0
+
+      # HELP http_request_duration_seconds HTTP request latency
+      # TYPE http_request_duration_seconds histogram
+      http_request_duration_seconds_bucket{le="0.1"} 12
+      http_request_duration_seconds_count 12
+      ```
+    </CodeGroup>
+
+    Available metrics include:
+
+    - `http_requests_total` - Total HTTP requests by method, endpoint, status
+    - `http_request_duration_seconds` - Request latency histogram
+    - `agent_tasks_active` - Currently active tasks gauge
+    - `http_response_size_bytes` - Response body size summary
+    - `http_requests_in_flight` - Current requests being processed
+  </Step>
+</Steps>
+
+## The Value Of Operational Visibility
+
+Monitoring only matters if it turns uncertainty into action.
+
+This model gives you:
+
+- **fast readiness checks** - platforms can see whether the agent should receive traffic
+- **runtime clarity** - developers can inspect backend and system state quickly
+- **measurable performance** - latency, traffic, and active work become visible over time
+
+This is the point of the whole model: as agents grow more capable, the truth about their condition should become easier to see, not harder.
+
+## Real-World Use Cases
+
+<AccordionGroup>
+  <Accordion title="Kubernetes or container readiness checks">
+    A deployment platform can call `/health` before routing traffic to the agent, making sure requests only hit instances that are actually ready.
+
+    ```bash
+    curl http://localhost:3773/health
+    ```
+  </Accordion>
+
+  <Accordion title="Prometheus-based monitoring">
+    A monitoring stack can scrape `/metrics` continuously to track request counts, latency changes, and current task volume.
+
+    ```bash
+    curl http://localhost:3773/metrics
+    ```
+  </Accordion>
+
+  <Accordion title="Debugging runtime dependencies">
+    If an agent appears live but behaves incorrectly, the health response can reveal which runtime pieces are active and whether strict readiness is being met.
+
+    ```json
+    {
+      "runtime": {
         "storage_backend": "PostgresStorage",
         "scheduler_backend": "RedisScheduler",
         "task_manager_running": true,
         "strict_ready": true
-    },
-    "application": {
-        "penguin_id": "<penguin_id>",
-        "agent_did": "<agent_did>"
-    },
-    "system": {
-        "python_version": "<python_version>",
-        "platform": "<platform>",
-        "platform_release": "<platform_release>",
-        "environment": "<environment>"
+      }
     }
-}
-```
+    ```
+  </Accordion>
+</AccordionGroup>
 
-**Response Fields:**
-- `status` - Overall health status (`ok` or `error`)
-- `ready` - Whether agent is ready to accept requests
-- `uptime_seconds` - Time since agent started
-- `version` - Bindu version number
-- `health` - Health status (`healthy` or `unhealthy`)
-- `runtime` - Runtime information:
-  - `storage_backend` - Storage backend type (e.g., `PostgresStorage`)
-  - `scheduler_backend` - Scheduler backend type (e.g., `RedisScheduler`)
-  - `task_manager_running` - Whether task manager is running
-  - `strict_ready` - Strict readiness check status
-- `application` - Application information:
-  - `penguin_id` - Unique penguin identifier
-  - `agent_did` - Agent's DID (Decentralized Identifier)
-- `system` - System information:
-  - `python_version` - Python version
-  - `platform` - Operating system platform
-  - `platform_release` - OS release version
-  - `environment` - Deployment environment
+## Security Best Practices
 
-## Metrics API
+<CardGroup cols={2}>
+  <Card title="Monitor Readiness, Not Just Liveness" icon="heart-pulse">
+    Use the full `/health` response to validate agent readiness instead of relying only on process existence.
+  </Card>
+  <Card title="Track Metrics Continuously" icon="chart-column">
+    Scrape `/metrics` over time so latency, concurrency, and traffic issues are visible before they become outages.
+  </Card>
+</CardGroup>
 
-Get Prometheus-compatible metrics for monitoring:
+---
 
-```bash
-curl http://localhost:3773/metrics
-```
+## Related
 
-**Available Metrics:**
-- `http_requests_total` - Total HTTP requests by method, endpoint, status
-- `http_request_duration_seconds` - Request latency histogram
-- `agent_tasks_active` - Currently active tasks gauge
-- `http_response_size_bytes` - Response body size summary
-- `http_requests_in_flight` - Current requests being processed
+* https://prometheus.io/
+* /bindu/learn/observability/overview
+* /bindu/learn/storage/overview
 
-**Example Output:**
-```prometheus
-# HELP http_requests_total Total number of HTTP requests
-# TYPE http_requests_total counter
-http_requests_total{method="GET",endpoint="/health",status="200"} 1
+---
 
-# HELP agent_tasks_active Currently active tasks
-# TYPE agent_tasks_active gauge
-agent_tasks_active{agent_id="did:bindu:..."} 0
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
 
-# HELP http_request_duration_seconds HTTP request latency
-# TYPE http_request_duration_seconds histogram
-http_request_duration_seconds_bucket{le="0.1"} 12
-http_request_duration_seconds_count 12
-```
+  <span className="brand-quote-text">
+    With Bindu, agent health is like a field of sunflowers{" "}
+    <span className="brand-quote-highlight">
+      each one standing on its own&nbsp;
+    </span>
+    yet easy to observe and trust.
+  </span>
+</span>

@@ -6,6 +6,8 @@ AI agent that crawls web pages and extracts structured data.
 
 ## Code
 
+Create `web-scraping-agent.py` with the code below, or save it directly from your editor.
+
 ```python
 """Web Scraping AI Agent (Local & Cloud SDK)
 
@@ -99,6 +101,81 @@ if __name__ == "__main__":
     bindufy(config, handler)
 ```
 
+## Skill Configuration
+
+Create `skills/web-scraping-skill/skill.yaml`:
+
+```yaml
+# Web Scraping Skill
+# AI-enabled web scraping that crawls pages and extracts structured data
+
+id: web-scraping-skill
+name: web-scraping-skill
+version: 1.0.0
+author: bindu.builder@getbindu.com
+
+description: |
+  AI-enabled web scraping skill that crawls web pages, extracts structured data,
+  cleans and formats outputs, and prepares datasets for analysis or integration.
+
+tags:
+  - web-scraping
+  - data-processing
+  - extraction
+  - crawler
+  - scrape
+  - structured-data
+
+input_modes:
+  - application/json
+
+output_modes:
+  - application/json
+
+examples:
+  - "Extract product listings from this e-commerce site: https://example.com/products"
+  - "Scrape blog titles and publish dates from https://example.com/blog"
+  - "Get all article headlines from this news page"
+
+capabilities_detail:
+  web_scraping:
+    supported: true
+    description: "Crawl and extract structured data from any public web page"
+  data_processing:
+    supported: true
+    description: "Clean, normalize, and format extracted content into structured JSON"
+  memory:
+    supported: true
+    description: "Remember previously scraped URLs and extraction profiles via Mem0"
+  deduplication:
+    supported: true
+    description: "Avoid re-scraping already processed URLs"
+
+assessment:
+  keywords:
+    - scrape
+    - crawl
+    - extract
+    - web
+    - website
+    - product listings
+    - blog titles
+    - data collection
+    - html
+    - structured data
+
+  specializations:
+    - domain: e_commerce_extraction
+      confidence_boost: 0.3
+    - domain: content_aggregation
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "pdf extraction"
+    - "database query"
+    - "audio transcription"
+    - "image generation"
+```
 ## How It Works
 
 **Web Scraping**
@@ -125,17 +202,13 @@ if __name__ == "__main__":
 - Memory-based optimization and caching
 - Multi-format data preparation
 
-## Run
+
+## Dependencies
 
 ```bash
-uv run examples/specialized/web-scraping-agent.py
+uv init
+uv add bindu agno python-dotenv scrapegraphai mem0ai
 ```
-
-Try: "Extract product information from https://example-shop.com including prices, names, and descriptions"
-
-Go to frontend and run npm run dev
-
-Open http://localhost:5173 and try to chat with the web scraping agent
 
 ## Environment Setup
 
@@ -143,12 +216,82 @@ Create `.env` file:
 ```bash
 SCRAPEGRAPH_API_KEY=your_scrapegraph_api_key
 MEM0_API_KEY=your_mem0_api_key
-OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
 
-## Dependencies
+## Run
 
-Install required packages:
 ```bash
-pip install agno bindu-penguin python-dotenv scrapegraph mem0ai
+uv run web-scraping-agent.py
 ```
+
+**Examples:**
+
+- "Extract product information from https://example-shop.com including prices, names, and descriptions"
+- "Scrape news headlines from multiple news websites"
+- "Get pricing data from e-commerce product pages"
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Extract product information from https://example-shop.com including prices, names, and descriptions"
+        }
+      ]
+    },
+     "skillId": "web-scraping-skill",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the web scraping agent
+

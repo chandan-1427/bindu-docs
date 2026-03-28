@@ -1,52 +1,161 @@
 ---
 title: "Payment Integration (X402)"
-description: "Monetize AI agents with cryptocurrency payments"
+description: "Monetize AI agents with verifiable, on-chain payments"
 ---
 
-Bindu supports the **X402 payment protocol**, enabling you to monetize your AI agents by requiring cryptocurrency payments before executing specific methods.
+Free access works when every interaction is low-stakes. It breaks down when an agent delivers premium output, consumes paid infrastructure, or needs to enforce economic boundaries before work begins.
 
-## How It Works
+## Why Payments Matter
+
+In an open Agent-to-Agent network, payment cannot depend on manual invoicing, custom dashboards, or a centralized billing gate. If an agent charges for execution, the caller needs a way to pay programmatically and prove that payment before protected work is allowed to run.
+
+| Traditional Payment Rails | Bindu X402 Payments |
+| --- | --- |
+| Built for human checkout flows | Built for agent-to-agent and API-native flows |
+| Verification often depends on a provider webhook | Verification is tied to on-chain payment proof |
+| Hard to compose inside autonomous workflows | Designed to slot into agent execution paths |
+| Usually centered on accounts and dashboards | Centered on requests, sessions, and payment tokens |
+| Weak fit for crypto-native machine payments | Native fit for verifiable on-chain settlement |
+
+That is the shift: Bindu gives agents a programmatic payment layer that can create sessions, verify on-chain payment, and issue short-lived access tokens for protected methods.
+
+<Note>
+If an agent offers premium actions, the calling system should not have to rely on a human approval step or a private billing back office. It should be able to pay, prove payment, and continue automatically.
+</Note>
+
+## How Bindu Payments Work
+
+Bindu supports the **X402 payment protocol**, allowing you to require payment before executing specific agent methods. After a successful payment, Bindu issues a short-lived payment token that is used to access paid functionality.
+
+### The Payment Model
+
+Bindu uses a straightforward payment lifecycle:
+
+```text
+payment session -> wallet payment -> on-chain verification -> payment token
+```
+
+Example flow:
+
+```text
+user request -> paid method -> session created -> payment completed -> token issued
+```
+
+The model is easy for developers to reason about and strict enough for production controls:
+
+- A **payment session** defines what must be paid
+- A **wallet transaction** settles the payment on-chain
+- A **verification step** confirms the transaction details
+- A **payment token** proves access for the protected method
+
+<CardGroup cols={3}>
+  <Card title="Programmatic" icon="robot">
+    Payments can be initiated and completed as part of automated agent workflows.
+  </Card>
+  <Card title="Verifiable" icon="shield-check">
+    Bindu checks blockchain data before issuing access to protected methods.
+  </Card>
+  <Card title="Scoped" icon="key">
+    Payment tokens are short-lived, task-specific, and bound to the paid access path.
+  </Card>
+</CardGroup>
+
+### The Lifecycle: Session, Verification, Access
+
+Under the hood, every paid Bindu interaction moves through three practical stages.
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Agent
-    participant Blockchain
     participant Wallet
+    participant Blockchain
 
-    Note over User,Agent: 1. Start Payment Session
-    User->>Agent: POST /api/start-payment-session
-    Agent->>Agent: Create session (15 min expiry)
-    Agent-->>User: {session_id, browser_url}
+    Note over User,Agent: 1. Session
+    User->>Agent: Request protected method
+    Agent-->>User: Payment session + browser_url
 
-    Note over User,Wallet: 2. Complete Payment in Browser
-    User->>Agent: Open browser_url
-    Agent-->>User: Show paywall UI
-    User->>Wallet: Connect wallet (MetaMask/Coinbase)
-    Wallet-->>User: Wallet connected
+    Note over User,Blockchain: 2. Verification
     User->>Wallet: Approve transaction
-    Wallet->>Blockchain: Submit USDC transfer
-    Blockchain-->>Wallet: Transaction confirmed
-    Wallet->>Agent: Send X-PAYMENT header<br/>(signed transaction)
-    Agent->>Agent: Store payment in session
+    Wallet->>Blockchain: Submit payment
+    Blockchain-->>Agent: Transaction confirmation
 
-    Note over User,Agent: 3. Verify Payment
-    User->>Agent: GET /api/payment-status/{session_id}
-    Agent->>Agent: Check session status
-    Agent-->>User: {status: completed, payment_token}
-
-    Note over User,Agent: 4. Use Protected Method
-    User->>Agent: POST / (JSON-RPC)<br/>X-Payment-Token: {token}
-    Agent->>Agent: Validate payment token
-    Agent->>Blockchain: Verify transaction on-chain<br/>(balance, signature)
-    Blockchain-->>Agent: Valid
-    Agent->>Agent: Execute protected method
-    Agent-->>User: Response
+    Note over User,Agent: 3. Access
+    Agent-->>User: payment_token
+    User->>Agent: Call protected method with token
+    Agent-->>User: Paid response
 ```
 
-## Configuration
+<Steps>
+  <Step title="Session">
+    Bindu creates a payment session whenever a caller attempts to access a protected method. The session captures the amount, token, network, and recipient wallet.
 
-Add `execution_cost` to your agent config:
+    ```python
+    config = {
+        "author": "your.email@example.com",
+        "name": "paid_agent",
+        "description": "An agent that requires payment",
+        "deployment": {"url": "http://localhost:3773", "expose": True},
+        "execution_cost": {
+            "amount": "$0.0001",
+            "token": "USDC",
+            "network": "base-sepolia",
+            "pay_to_address": "0xYourWalletAddressHere",
+            "protected_methods": ["message/send"]
+        }
+    }
+    ```
+
+    Think of it like this: the config defines the economic gate, and Bindu turns that policy into a concrete payment session at runtime.
+  </Step>
+
+  <Step title="Verification">
+    The user completes payment in their wallet. Bindu then validates the transaction on-chain by checking the sender, recipient, amount, and network before it grants access.
+
+    <CodeGroup>
+      ```bash Request
+      curl http://localhost:3773/api/payment-status/<session_id>
+      ```
+
+      ```json Response
+      {
+        "status": "completed",
+        "payment_token": "<token>"
+      }
+      ```
+    </CodeGroup>
+
+    Only verified transactions result in token issuance.
+  </Step>
+
+  <Step title="Access">
+    Once payment is verified, the caller uses the returned payment token to access the protected method.
+
+    <CodeGroup>
+      ```bash Protected Request
+      curl http://localhost:3773/ \
+        -H "X-Payment-Token: <token>" \
+        -d '{ "method": "message/send" }'
+      ```
+
+      ```json Protected Response
+      {
+        "result": "Paid method executed successfully"
+      }
+      ```
+    </CodeGroup>
+
+    The token is short-lived and scoped to the paid interaction rather than acting like a reusable long-term credential.
+  </Step>
+</Steps>
+
+---
+
+## Payment Configuration
+
+Bindu lets you define either a single payment path or multiple acceptable payment options depending on how flexible you want the checkout experience to be.
+
+### Single Option
 
 ```python
 config = {
@@ -55,164 +164,158 @@ config = {
     "description": "An agent that requires payment",
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "execution_cost": {
-        "amount": "$0.0001",           # Amount in USD (converted to USDC)
-        "token": "USDC",                # Token type
-        "network": "base-sepolia",      # Network (base-sepolia for testing)
-        "pay_to_address": "0x265<your-wallet-address>",
-        "protected_methods": [
-            "message/send"              # Methods requiring payment
-        ]
+        "amount": "$0.0001",
+        "token": "USDC",
+        "network": "base-sepolia",
+        "pay_to_address": "0xYourWalletAddressHere",
+        "protected_methods": ["message/send"]
     }
 }
 ```
 
-## Setup for Testing
+### Multiple Options
 
-### 1. Create a Crypto Wallet
-
-**MetaMask (Recommended):**
-1. Install [MetaMask browser extension](https://metamask.io/)
-2. Create a new wallet
-3. Copy your wallet address (starts with `0x...`)
-
-**Coinbase Wallet:**
-1. Install [Coinbase Wallet extension](https://www.coinbase.com/wallet)
-2. Set up your wallet
-3. Copy your wallet address
-
-### 2. Get Test USDC
-
-For Base Sepolia testnet:
-
-1. **Get Base Sepolia ETH** (for gas fees):
-   - Visit [Chainlink Faucet](https://faucets.chain.link/base-sepolia)
-   - Connect your wallet
-   - Request test ETH
-
-2. **Get Base Sepolia USDC**:
-   - The payment system will guide you through obtaining test USDC
-
-### 3. Update Agent Configuration
+You can provide multiple payment options. Any one of them satisfies access.
 
 ```python
-"pay_to_address": "0xYourWalletAddressHere"
-```
-
-## Payment Flow
-
-### Step 1: Start a Payment Session
-
-```bash
-curl --location --request POST 'http://localhost:3773/api/start-payment-session' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-access-token>'
-```
-
-**Response:**
-```json
-{
-    "session_id": "<session-id>",
-    "browser_url": "http://localhost:3773/payment-capture?session_id=<session-id>",
-    "expires_at": "<expires-at>",
-    "status": "pending"
-}
-```
-
-### Step 2: Complete Payment in Browser
-
-1. Open the `browser_url` in your browser
-2. Connect your wallet (MetaMask or Coinbase Wallet)
-3. Review payment details:
-   - Amount in USDC
-   - Recipient address
-   - Network (Base Sepolia)
-4. Approve and sign the transaction
-5. Wait for blockchain confirmation
-
-### Step 3: Verify Payment Status
-
-```bash
-curl --location 'http://localhost:3773/api/payment-status/<session_id>' \
---header 'Authorization: Bearer <your-access-token>'
-```
-
-**Response:**
-```json
-{
-    "session_id": "<session-id>",
-    "status": "completed",
-    "payment_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-### Step 4: Use the Agent with Payment Token
-
-```bash
-curl --location 'http://localhost:3773/' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-access-token>' \
---header 'X-Payment-Token: <payment-token>' \
---data '{
-    "jsonrpc": "2.0",
-    "method": "message/send",
-    "params": {
-        "message": {
-            "role": "user",
-            "content": "Hello, paid agent!"
+config = {
+    "execution_cost": [
+        {
+            "amount": "0.1",
+            "token": "USDC",
+            "network": "base",
+            "pay_to_address": "0xYourWalletAddressHere",
+        },
+        {
+            "amount": "0.0001",
+            "token": "ETH",
+            "network": "ethereum",
+            "pay_to_address": "0xYourWalletAddressHere",
         }
-    },
-    "id": 1
-}'
+    ]
+}
 ```
 
-## Example Implementation
+Each model serves a different need:
 
-See the complete example:
-```
-examples/beginner/echo_agent_behind_paywall.py
-```
+- Use a **single option** when the payment path should be predictable and simple
+- Use **multiple options** when callers may pay with different assets or networks
+- Protect only the methods that actually require monetization through `protected_methods`
 
-## Payment Behavior
+<Note>
+If you are testing for the first time, start on `base-sepolia`, fund a wallet with test assets, and set `pay_to_address` explicitly before exposing paid methods.
+</Note>
 
-- Each new task requires payment when the agent is behind a paywall
-- If a task returns `input_required` status, no payment is needed for that interaction
-- Once a task completes successfully, a new payment is required for the next task
-- Payment tokens are task-specific and cannot be reused
+### Standards
 
-## Security Considerations
+<CardGroup cols={3}>
+  <Card title="X402 Protocol" icon="credit-card" href="https://github.com/coinbase/x402">
+    The payment protocol Bindu uses to structure monetized API and agent flows.
+  </Card>
+  <Card title="Base Network Info" icon="globe" href="https://docs.base.org/network-information">
+    Network details for configuring supported chains such as Base and Base Sepolia.
+  </Card>
+  <Card title="JWT Access Tokens" icon="key-round" href="https://jwt.io/introduction">
+    Short-lived payment tokens give callers scoped proof of successful payment.
+  </Card>
+</CardGroup>
 
-- **Wallet Security**: Never share private keys or seed phrases
-- **Test Networks**: Always test on Base Sepolia before mainnet
-- **Payment Verification**: Payments are verified on-chain via blockchain signatures
-- **Session Expiration**: Payment sessions expire after 60 seconds by default
-- **Token Storage**: Payment tokens are JWTs with expiration times
+## The Value of Verifiable Payments
 
-## Production Deployment
+Payments only matter if they hold up when a request is challenged, replayed, or audited.
 
-When ready for production:
+This model gives you:
 
-1. **Switch to Base Mainnet**:
-   ```python
-   "network": "base"  # Change from "base-sepolia"
-   ```
+- **Access control** - Protected methods only run after verified payment
+- **Integrity** - The payment is checked against blockchain data before access is granted
+- **Composability** - Agents can include payment directly inside autonomous workflows
 
-2. **Use Real USDC**: Ensure users have actual USDC on Base mainnet
+This is the point of the whole model: monetization becomes part of protocol behavior instead of a disconnected billing system.
 
-3. **Update Wallet Address**: Use your production wallet address
+## Real-World Use Cases
 
-4. **Monitor Payments**: Track incoming payments to your wallet
+<AccordionGroup>
+  <Accordion title="Premium research or inference endpoints">
+    If an agent performs expensive inference, premium research, or API-backed work, payment can be required before execution so infrastructure cost is enforced at the request boundary.
 
-5. **Set Appropriate Pricing**: Adjust `amount` based on service value
+    ```python
+    def require_payment_before_inference(session_status):
+        if session_status["status"] != "completed":
+            raise PermissionError("Payment required before premium inference.")
+        return "Inference can proceed"
+    ```
+  </Accordion>
 
-## Tips
+  <Accordion title="Agent-to-agent paid task execution">
+    One agent can pay another for specialized work, then pass the payment token with the protected call to complete the transaction programmatically.
 
-- **Start Small**: Use low amounts for testing (e.g., `$0.0001`)
-- **Clear Communication**: Inform users about payment requirements upfront
-- **Handle Failures**: Implement proper error handling for failed payments
-- **Session Management**: Clean up expired payment sessions regularly
-- **User Experience**: Provide clear instructions in your UI
+    ```python
+    async def call_paid_agent(payment_token, payload):
+        headers = {"X-Payment-Token": payment_token}
+        return await httpx.post("http://localhost:3773/", headers=headers, json=payload)
+    ```
+  </Accordion>
+
+  <Accordion title="Micropayments for metered APIs">
+    Small, per-task payments work well for lightweight operations such as summarization, classification, scraping, or data transformation where subscriptions would add unnecessary friction.
+
+    ```python
+    config = {
+        "execution_cost": {
+            "amount": "$0.0001",
+            "token": "USDC",
+            "network": "base-sepolia",
+            "pay_to_address": "0xYourWalletAddressHere",
+            "protected_methods": ["message/send"]
+        }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Crypto-native developer products">
+    If your product already lives in an on-chain environment, X402 lets your payment logic stay aligned with the rest of the system instead of bridging through a separate billing stack.
+
+    ```python
+    def verify_paid_access(session):
+        return session.get("status") == "completed" and "payment_token" in session
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Keep Prices Explicit" icon="coins">
+    Clearly define amount, token, network, and protected methods so callers know exactly what they are paying for.
+  </Card>
+  <Card title="Scope Tokens Tightly" icon="lock">
+    Use short-lived, task-specific payment tokens and avoid treating them like reusable API credentials.
+  </Card>
+</CardGroup>
+
+---
 
 ## Related
 
-- [X402 Protocol Specification](https://github.com/coinbase/x402)
-- [Base Sepolia Testnet](https://docs.base.org/network-information)
+* https://github.com/coinbase/x402
+* https://docs.base.org/network-information
+* /bindu/learn/did/overview
+
+---
+
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+
+  <span className="brand-quote-text">
+    Bindu allows agents to bloom independently{" "}
+    <span className="brand-quote-highlight">
+      turning trust into verifiable value
+    </span>
+    , and bringing light to the Internet of Agents.
+  </span>
+</span>

@@ -6,6 +6,8 @@ AI agent that transcribes audio files and formats transcripts.
 
 ## Code
 
+Create `speech-to-text-agent.py` with the code below, or save it directly from your editor.
+
 ```python
 import base64
 import os
@@ -143,6 +145,74 @@ if __name__ == "__main__":
     bindufy(config=config, handler=handler)
 ```
 
+## Skill Configuration
+
+Create `skills/speech-recognition/skill.yaml`:
+
+```yaml
+# Speech Recognition Skill
+# Converts audio files and live speech into structured text
+
+id: speech-recognition-v1
+name: speech-recognition
+version: 1.0.0
+author: raahul@getbindu.com
+
+description: |
+  An AI transcription skill that converts audio files and live speech into structured text.
+  Supports multiple audio formats and provides speaker detection and formatting.
+
+tags:
+  - speech
+  - transcription
+  - audio
+  - voice-to-text
+  - recognition
+
+input_modes:
+  - audio/wav
+  - audio/mpeg
+  - audio/mp3
+  - audio/m4a
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Transcribe this podcast episode."
+  - "Convert lecture audio into text notes."
+  - "Extract text from this voice recording."
+
+capabilities_detail:
+  transcription:
+    supported: true
+    formats: ["wav", "mp3", "m4a"]
+    features:
+      - duration_detection
+      - simple_formatting
+  speaker_detection:
+    supported: true
+    description: "Identifies different speakers in the audio stream"
+  formatting:
+    supported: true
+    description: "Formats transcribed text into paragraphs and documents"
+
+assessment:
+  keywords:
+    - transcribe
+    - transcription
+    - speech
+    - audio
+    - voice
+    - notes
+  specializations:
+    - domain: podcast_transcription
+      confidence_boost: 0.2
+    - domain: lecture_notes
+      confidence_boost: 0.2
+```
+
 ## How It Works
 
 **Audio Transcription**
@@ -163,23 +233,12 @@ if __name__ == "__main__":
 - Markdown formatting for readability
 - Discussion summarization capabilities
 
-**Agent Capabilities**
+### Agent Capabilities
+
 - Speech-to-text specialization with audio expertise
 - File path validation and processing
 - Multi-speaker conversation handling
 - Structured output with summaries
-
-## Run
-
-```bash
-uv run examples/specialized/speech-to-text-agent.py
-```
-
-Try: "Transcribe the audio file at /path/to/meeting.mp3 and identify the speakers"
-
-Go to frontend and run npm run dev
-
-Open http://localhost:5173 and try to chat with the speech-to-text agent
 
 ## Supported Formats
 
@@ -190,7 +249,86 @@ Open http://localhost:5173 and try to chat with the speech-to-text agent
 
 ## Dependencies
 
-Install required packages:
 ```bash
-pip install agno bindu-penguin python-dotenv
+uv init
+uv add bindu agno python-dotenv
 ```
+
+## Environment Setup
+
+Create `.env` file:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+```
+
+## Run
+
+```bash
+uv run speech-to-text-agent.py
+```
+
+Try: "Transcribe the audio file at /path/to/meeting.mp3 and identify speakers"
+
+## Example API Calls
+
+<AccordionGroup>
+  <Accordion title="Message Send Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "role": "user",
+      "kind": "message",
+      "messageId": "9f11c870-5616-49ad-b187-d93cbb100001",
+      "contextId": "9f11c870-5616-49ad-b187-d93cbb100002",
+      "taskId": "9f11c870-5616-49ad-b187-d93cbb100003",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Transcribe the audio file at /path/to/meeting.mp3 and identify the speakers"
+        }
+      ]
+    },
+     "skillId": "speech-recognition-v1",
+    "configuration": {
+      "acceptedOutputModes": ["application/json"]
+    }
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100003"
+}
+```
+  </Accordion>
+  
+  <Accordion title="Task get Request">
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tasks/get",
+  "params": {
+    "taskId": "9f11c870-5616-49ad-b187-d93cbb100003"
+  },
+  "id": "9f11c870-5616-49ad-b187-d93cbb100004"
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Setup
+
+```bash
+# Clone the Bindu repository
+git clone https://github.com/GetBindu/Bindu
+
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start frontend development server
+npm run dev
+```
+
+Open http://localhost:5173 and try to chat with the speech-to-text agent

@@ -2,10 +2,6 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "linden",
   "name": "Bindu",
-  "banner": {
-    "content": "🌻 Where AI agents bloom and ideas take flight - [Discover what's new](https://docs.getbindu.com)",
-    "dismissible": true
-  },
   "colors": {
     "primary": "#8B5CF6",
     "light": "#A78BFA",
@@ -244,13 +240,20 @@
       },
       {
         "tab": "Roadmap",
-        "pages": ["roadmap/introduction/overview"]
+        "groups": [
+          {
+            "group": "Roadmap",
+            "pages": [
+              "roadmap/introduction/overview"
+            ]
+          }
+        ]
       },
       {
         "tab": "Changelog",
         "groups": [
           {
-            "group": "2026 Releases",
+            "group": "Updates",
             "pages": [
               "changelog/v2026.12.5",
               "changelog/v2026.9.4",
@@ -268,7 +271,7 @@
         "tab": "FAQ",
         "groups": [
           {
-            "group": "FAQ",
+            "group": "Frequently Asked Questions",
             "pages": [
               "faq/introduction/overview"
             ]

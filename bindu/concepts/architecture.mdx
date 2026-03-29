@@ -1,19 +1,33 @@
 ---
 title: "Architecture: How Bindu Works"
+description: "The layered architecture that powers Bindu task execution, protocol handling, storage, observability, and scale"
 ---
 
+When you send a message to a Bindu agent, a lot more happens than a simple function call. The request moves through protocol handling, security checks, task orchestration, worker execution, storage, and observability before it comes back as a result.
 
-In [Key Concepts](/bindu/introduction/key-concepts), you saw how Bindu's task lifecycle enables interactive conversations with states like `submitted`, `input-required`, and `completed`. This guide explains the **technical architecture** that makes it possible—from protocol layers to storage backends.
+## Why Architecture Matters
 
-**What You'll Learn:**
-- How requests flow through Bindu's layered architecture
-- Why TaskManager coordinates everything (the "restaurant manager")
-- How workers execute your agent asynchronously
-- Storage, caching, and scaling strategies
+In [Key Concepts](/bindu/introduction/key-concepts), you saw how task states like `submitted`, `input-required`, and `completed` make interactive workflows possible. The architecture is the part that makes those states real in a running system.
 
-**Quick Context:** When you send a message, it creates a task that flows through multiple layers. This page shows you what happens at each layer and why.
+| Flat application model | Bindu layered architecture |
+| --- | --- |
+| Request handling, execution, and storage blur together | Each layer has a clear job in the lifecycle |
+| Scaling usually means rewriting core pieces | Storage, queueing, and workers can evolve independently |
+| Observability is bolted on late | Traces, LLM observability, and metrics are part of the runtime |
+| Protocol support becomes tightly coupled to business logic | Protocol, security, orchestration, and execution stay separated |
+| Hard to reason about what happens after a message arrives | The request flow is explicit from client to artifact |
 
-## System Overview
+That is the shift: Bindu is built as a layered system so each part of task execution can do one job well without collapsing into a single opaque runtime.
+
+<Note>
+When a message creates a task, that task moves through several layers, not just one server endpoint. The architecture matters because each layer is responsible for part of that lifecycle.
+</Note>
+
+## How Bindu Architecture Works
+
+Bindu is organized into protocol, security, application, orchestration, storage, agent, and observability layers. Each one participates in turning a message into a task and a task into a result.
+
+### The System Layout
 
 ```mermaid
 graph TB
@@ -127,71 +141,25 @@ graph TB
     style Metrics fill:#ffd700
 ```
 
----
+The layered structure is what lets Bindu stay simple on the surface while still handling protocol, identity, execution, and scaling concerns underneath.
 
-## Core Components
+<CardGroup cols={3}>
+  <Card title="Layered" icon="boxes-stacked">
+    Protocol, security, orchestration, storage, and observability each live in their own part of the system.
+  </Card>
+  <Card title="Task-Centered" icon="list-tree">
+    TaskManager sits in the middle because task state is the thing the rest of the system coordinates around.
+  </Card>
+  <Card title="Scalable" icon="globe">
+    Storage backends, queues, workers, and agent frameworks can change without changing the whole model.
+  </Card>
+</CardGroup>
 
-### 1. Protocol Layer
+### The Lifecycle: Accept, Execute, Return
 
-**A2A Protocol** - Agent-to-agent communication (task lifecycle, context management)  
-**AP2 Protocol** - Commerce extensions (payment mandates, cart management)  
-**X402 Protocol** - Micropayments (cryptographic signatures, multi-currency)
-
-All use JSON-RPC 2.0 for request/response handling.
-
----
-### 2. Security & Identity Layer
-
-**Authentication** - Auth0, OAuth2, API Keys, Mutual TLS  
-**DID (Decentralized Identity)** - Unique, verifiable agent identity  
-**PKI** - RSA/ECDSA key generation, signature verification
-
----
-### 3. Application Layer
-
-**BinduApplication** - Starlette-based web server with async/await, WebSocket support  
-**Request Router** - Routes to `/agent/card`, `/agent/skills`, `/tasks/*`, `/contexts/*`  
-**Schema Validator** - Validates request structure and types
-
----
-### 4. Orchestration Layer
-
-**TaskManager** - Central coordinator that creates tasks, manages state, coordinates workers  
-**Task Queue** - Memory (dev) or Redis (prod) for distributed task scheduling  
-**Worker Pool** - Executes tasks asynchronously, handles retries and timeouts
-
----
-### 5. Storage Layer
-
-**Memory Storage** (dev) - In-memory dictionaries for tasks, contexts, artifacts  
-**PostgreSQL** (prod) - ACID compliance, relational queries, JSON support  
-**Redis Cache** - Session storage, rate limiting, pub/sub notifications
-
----
-### 6. Agent Layer
-
-**Framework Agnostic** - Works with Agno, LangChain, CrewAI, LlamaIndex  
-**Skills Registry** - Defines agent capabilities via `/agent/skills` endpoint  
-**Tool Integrations** - 113+ built-in toolkits for data, code, web, APIs
-
----
-### 7. Observability Layer
-
-**Distributed Tracing** - Jaeger/OTLP tracks requests across all components  
-**LLM Observability** - Phoenix/Langfuse monitors token usage, latency, cost  
-**Metrics** - Request rate, task duration, error rate, queue depth, worker utilization
-
----
-
-## Data Flow
-
-### Complete Request Lifecycle
-
-Let's trace a complete request through the system:
-
+Under the hood, every request moves through three practical stages.
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'11px'}}}%%
 sequenceDiagram
     participant Client
     participant Server as BinduApplication
@@ -203,99 +171,171 @@ sequenceDiagram
     participant Agent as AI Agent
     participant Obs as Observability
     
+    Note over Client,Manager: 1. Accept
     Client->>Server: POST / (message/send)
     Server->>Obs: Start trace
     Server->>Auth: Verify credentials
     Auth-->>Server: Authenticated
-    
     Server->>Manager: Create task
     Manager->>Storage: Save task (status: submitted)
-    Storage-->>Manager: Task saved
     Manager->>Queue: Enqueue task_id
-    Queue-->>Manager: Queued
     Manager-->>Server: Task created
     Server-->>Client: 200 OK (task with submitted state)
     
-    Note over Client,Server: Client can poll or use webhooks
-    
+    Note over Queue,Agent: 2. Execute
     Queue->>Worker: Dequeue task_id
     Worker->>Storage: Get task details
-    Storage-->>Worker: Task data
     Worker->>Manager: Update status (working)
     Manager->>Storage: Update status
     Manager->>Client: Push notification (working)
-    
     Worker->>Agent: Execute with messages
     Agent->>Obs: Log LLM calls
     Agent-->>Worker: Result
     
+    Note over Worker,Client: 3. Return
     Worker->>Manager: Complete task
     Manager->>Storage: Save artifact
     Manager->>Storage: Update status (completed)
     Manager->>Client: Push notification (completed)
     Manager->>Obs: End trace
-    
     Client->>Server: POST / (tasks/get)
     Server->>Storage: Get task
     Storage-->>Server: Task + artifact
     Server-->>Client: 200 OK (task with artifacts)
 ```
 
-### Request Flow Summary
+<Steps>
+  <Step title="Accept">
+    A client sends a `message/send` request. The protocol and security layers handle the request first, then the application layer validates it and passes it to `TaskManager`.
 
-**Phase 1: Submit (0-50ms)** - Client sends `message/send` → Auth validates → TaskManager creates task → Returns `task_id` immediately
+    `TaskManager` creates the task, stores it with state `submitted`, puts the task ID on the queue, and returns the task immediately.
+  </Step>
 
-**Phase 2: Execute (async)** - Worker dequeues → Runs your agent → Updates state (`working` → `input-required` or `completed`)
+  <Step title="Execute">
+    A worker dequeues the task, fetches the task details, and moves the task into `working`.
 
-**Phase 3: Retrieve (anytime)** - Client polls with `tasks/get` → Gets current state + artifacts
+    The worker then calls your agent. That agent may use frameworks such as Agno, LangChain, CrewAI, or LlamaIndex, plus skills and tool integrations.
+  </Step>
 
----
+  <Step title="Return">
+    Once the agent returns a result, `TaskManager` saves the artifact, updates the task state, and makes the finished task available through retrieval APIs and notifications.
 
-## Summary
+    The request flow summary is still the same:
 
-Bindu's architecture is designed for:
-
-- **Simplicity**: Wrap any agent with minimal code
-- **Scalability**: From localhost to distributed cloud
-- **Reliability**: Built-in error handling and recovery
-- **Observability**: Complete visibility into operations
-- **Security**: Authentication and identity built-in
-- **Standards**: Protocol-first design (A2A, AP2, X402)
-
-The layered architecture ensures each component can evolve independently while maintaining a cohesive system. Whether you're prototyping locally or deploying at scale, Bindu's architecture adapts to your needs.
-
-### Connecting the Dots
-
-**You've now seen three perspectives:**
-
-1. **[Key Concepts](/bindu/introduction/key-concepts)** - How task states enable interactive conversations
-2. **This Page (Architecture)** - The technical layers that power those states
-3. **[Task-First Pattern](/bindu/concepts/task-first-pattern)** - Why this design enables multi-agent orchestration
-
-**The Big Picture:** When you send "create sunset caption" and the agent asks "which platform?", here's what happens:
-- Your message hits the Protocol Layer → authenticated by Security Layer
-- TaskManager creates a task in "submitted" state → stored in Storage Layer
-- Worker executes your agent → agent returns structured response requesting input
-- TaskManager updates state to "input-required" → you see the question
-- You respond "Instagram" → same task continues → completes with artifact
-
-That's Bindu's architecture in action.
+    - **Phase 1: Submit (0-50ms)** - Client sends `message/send` -> Auth validates -> TaskManager creates task -> Returns `task_id` immediately
+    - **Phase 2: Execute (async)** - Worker dequeues -> Runs your agent -> Updates state (`working` -> `input-required` or `completed`)
+    - **Phase 3: Retrieve (anytime)** - Client polls with `tasks/get` -> Gets current state + artifacts
+  </Step>
+</Steps>
 
 ---
 
-## Next Steps
+## Core Components
 
-<CardGroup cols={2}>
-  <Card title="Protocol Types" icon="code" href="/bindu/concepts/protocol">
-    Learn about the data structures and types
-  </Card>
-  <Card title="Create Your Agent" icon="rocket" href="/bindu/create-bindu-agent/overview">
-    Build your first Bindu agent
-  </Card>
-  <Card title="Observability" icon="eye" href="/bindu/learn/observability/introduction">
-    Set up monitoring and tracing
-  </Card>
-  <Card title="Authentication" icon="shield" href="/bindu/learn/authentication/auth0">
-    Configure security and auth
-  </Card>
-</CardGroup>
+The architecture is easier to reason about when the layers are spelled out directly.
+
+### Protocol Layer
+
+- **A2A Protocol** - Agent-to-agent communication (task lifecycle, context management)
+- **AP2 Protocol** - Commerce extensions (payment mandates, cart management)
+- **X402 Protocol** - Micropayments (cryptographic signatures, multi-currency)
+
+All use JSON-RPC 2.0 for request and response handling.
+
+### Security And Identity Layer
+
+- **Authentication** - Auth0, OAuth2, API Keys, Mutual TLS
+- **DID (Decentralized Identity)** - Unique, verifiable agent identity
+- **PKI** - RSA/ECDSA key generation, signature verification
+
+### Application Layer
+
+- **BinduApplication** - Starlette-based web server with async/await, WebSocket support
+- **Request Router** - Routes to `/agent/card`, `/agent/skills`, `/tasks/*`, `/contexts/*`
+- **Schema Validator** - Validates request structure and types
+
+### Orchestration Layer
+
+- **TaskManager** - Central coordinator that creates tasks, manages state, coordinates workers
+- **Task Queue** - Memory (dev) or Redis (prod) for distributed task scheduling
+- **Worker Pool** - Executes tasks asynchronously, handles retries and timeouts
+
+### Storage Layer
+
+- **Memory Storage** (dev) - In-memory dictionaries for tasks, contexts, artifacts
+- **PostgreSQL** (prod) - ACID compliance, relational queries, JSON support
+- **Redis Cache** - Session storage, rate limiting, pub/sub notifications
+
+### Agent Layer
+
+- **Framework Agnostic** - Works with Agno, LangChain, CrewAI, LlamaIndex
+- **Skills Registry** - Defines agent capabilities via `/agent/skills` endpoint
+- **Tool Integrations** - 113+ built-in toolkits for data, code, web, APIs
+
+### Observability Layer
+
+- **Distributed Tracing** - Jaeger/OTLP tracks requests across all components
+- **LLM Observability** - Phoenix/Langfuse monitors token usage, latency, cost
+- **Metrics** - Request rate, task duration, error rate, queue depth, worker utilization
+
+<Note>
+The system works because these layers stay distinct. Protocol is not storage. Storage is not orchestration. Orchestration is not the agent itself.
+</Note>
+
+## The Value Of Layered Architecture
+
+The architecture is designed around a few practical goals.
+
+- **Simplicity** - Wrap any agent with minimal code
+- **Scalability** - From localhost to distributed cloud
+- **Reliability** - Built-in error handling and recovery
+- **Observability** - Complete visibility into operations
+- **Security** - Authentication and identity built-in
+- **Standards** - Protocol-first design (`A2A`, `AP2`, `X402`)
+
+This is the point of the layered design: each part can evolve independently while still fitting into one coherent system.
+
+## Real-World Use Cases
+
+<AccordionGroup>
+  <Accordion title="Following one request through the system">
+    When you send "create sunset caption", the request hits the Protocol Layer, is authenticated by the Security Layer, validated in the Application Layer, turned into a task by `TaskManager`, executed by a worker, and returned as a completed task with an artifact.
+  </Accordion>
+
+  <Accordion title="Interactive conversations with paused work">
+    If the agent asks "which platform?", the task does not disappear. `TaskManager` updates it into `input-required`, stores that state, and lets the same task continue when the user answers.
+  </Accordion>
+
+  <Accordion title="Scaling from local development to production">
+    In development, the same architecture can run with in-memory storage and queues. In production, those pieces can move to PostgreSQL and Redis without changing the task model.
+  </Accordion>
+
+  <Accordion title="Observing the whole path">
+    Tracing and metrics sit alongside execution so you can see requests move through the server, manager, worker, and agent instead of guessing which layer is slow or failing.
+  </Accordion>
+</AccordionGroup>
+
+## Related
+
+* /bindu/introduction/key-concepts
+* /bindu/concepts/task-first-pattern
+* /bindu/concepts/protocol
+
+---
+
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+
+  <span className="brand-quote-text">
+    Bindu works because each layer{" "}
+    <span className="brand-quote-highlight">
+      does one part of the job clearly
+    </span>
+    , so task execution stays understandable as the system grows.
+  </span>
+</span>

@@ -1,24 +1,35 @@
----
-title: 'Join the Internet of Agents'
----
-
-Remember that developer who spent three weeks on infrastructure?
-
-Let's make sure that's not you.
-
-In the next **2 minutes**, you'll have a production-ready agent.  
-Not a demo. Not a prototype.  
-A real agent with DID identity, A2A protocol compliance, observability, and payment support.
-
-Ready to communicate in the Internet of Agents.
-
-Let's go.
-
+﻿---
+title: "Join the Internet of Agents"
+description: "Get a production-ready Bindu agent running in minutes with the cookiecutter template or bindufy()"
 ---
 
-## The Fast Way - Cookiecutter Style
+Most developers do not get stuck on the agent logic. They get stuck on everything around it. Server setup, protocol handling, auth, identity, observability, deployment, CI, and the long trail of things that somehow become your job before the agent can go live.
 
-Time to first agent: **~2 minutes** ⏱️
+## Why This Matters
+
+The hard part is usually not writing the agent. The hard part is getting from "it works on my laptop" to "this thing can actually talk to other agents in production."
+
+| Starting From Scratch | Starting With Bindu |
+| --- | --- |
+| You assemble the server, config, auth, and deployment stack yourself | The template gives you a production-ready starting point |
+| Protocol support is another project | A2A, AP2, and X402 are already part of the setup |
+| Identity, tracing, and testing come later | DID, observability, and pytest are included from the start |
+| Existing agents need custom infrastructure glue | `bindufy()` wraps what you already built |
+| First usable version can take weeks | First usable version takes minutes |
+
+That is the point of this page: getting onto the Internet of Agents should not mean spending three weeks rebuilding plumbing.
+
+<Note>
+In the next 2 minutes, you can have a production-ready agent. Not a demo. Not a prototype. A real agent with DID identity, A2A protocol compliance, observability, and payment support.
+</Note>
+
+## How To Get Started Fast
+
+There are two practical paths. Use the cookiecutter template if you want the fastest clean start. Use `bindufy()` if you already have an agent and want to put it on Bindu without rewriting it.
+
+### The Fast Way: Cookiecutter Style
+
+Time to first agent: **~2 minutes**
 
 This is the fastest way to get started.
 
@@ -28,28 +39,76 @@ Navigate to the directory where you want to create your agent project and run:
 uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
 ```
 
-<Note>
-Make sure you have [uv](https://docs.astral.sh/uv/) installed. If not, install it with:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-</Note>
+<CardGroup cols={3}>
+  <Card title="Fast Setup" icon="rocket">
+    Start from a working project scaffold instead of wiring the basics by hand.
+  </Card>
+  <Card title="Protocol-Ready" icon="globe">
+    The generated project is ready for A2A, AP2, and X402-aware agent workflows.
+  </Card>
+  <Card title="Production Baseline" icon="server">
+    Testing, CI/CD, docs, and deployment scaffolding are already in place.
+  </Card>
+</CardGroup>
 
-<Note>
-For detailed documentation, see the [Template Overview](/bindu/create-bindu-agent/overview).
-</Note>
+### The Lifecycle: Generate, Run, Join
+
+```mermaid
+sequenceDiagram
+    participant Developer
+    participant Template as create-bindu-agent
+    participant Project as Generated Project
+    participant Bindu as Bindu Runtime
+    participant Network as Internet of Agents
+
+    Developer->>Template: uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
+    Template-->>Developer: Prompt for project details, framework, features, license
+    Template->>Project: Generate agent project structure
+    Developer->>Project: uv sync
+    Developer->>Project: uv run python -m your_agent.main
+    Project->>Bindu: Start agent at http://localhost:3773
+    Bindu->>Network: Expose A2A / AP2 / X402-capable agent
+```
+
+<Steps>
+  <Step title="Generate The Project">
+    Run the cookiecutter command and answer the setup prompts for project details, agent framework, features, and license type.
+
+    <CodeGroup>
+      ```bash Create Project
+      uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
+      ```
+
+      ```bash Install uv
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install And Start">
+    Move into the generated project, install dependencies with `uv`, and start the agent.
+
+    ```bash
+    cd your-agent
+    uv sync
+    uv run python -m your_agent.main
+    ```
+  </Step>
+
+  <Step title="Join The Network">
+    Your agent is now live at `http://localhost:3773`. It is speaking A2A, AP2, and X402, and other agents can discover it, talk to it, and pay it for services.
+  </Step>
+</Steps>
+
+---
 
 ## Already Built Something?
 
-You've got an agent running.  
-Maybe it's in LangChain. Maybe CrewAI. Maybe custom code.
+You've got an agent running. Maybe it's in LangChain. Maybe CrewAI. Maybe custom code.
 
-Doesn't matter.
+It does not matter. You can Bindu-fy it in **5 minutes**.
 
-You can Bindu-fy it in **5 minutes**.
-
-Two things you need: a config file and the `bindufy` wrapper.  
-That's it.
+Two things you need: a config file and the `bindufy` wrapper. That's it.
 
 ### Step 1: Create `agent_config.json`
 
@@ -70,7 +129,7 @@ That's it.
 See the [Configuration Reference](/bindu/create-bindu-agent/configuration) for all available options including A2A, AP2, and X402 protocol settings.
 </Note>
 
-### Step 2: Wrap Your Agent with `bindufy`
+### Step 2: Wrap Your Agent With `bindufy`
 
 ```python
 from bindu.penguin.bindufy import bindufy
@@ -99,32 +158,28 @@ bindufy(my_agent, config, agent_handler)
 
 **Done.**
 
-Your agent is now live.  
-Ready to communicate with other agents in the Internet of Agents.
+Your agent is now live. Ready to communicate with other agents in the Internet of Agents.
 
 No infrastructure setup.  
 No protocol implementation.  
 No weeks of DevOps work.
 
-Just your agent, now accessible to the world.
-
-<Tip>
+<Note>
 Check out [examples](https://github.com/getbindu/Bindu/tree/main/examples) for different agent frameworks like LangChain, CrewAI, and more.
-</Tip>
-
----
+</Note>
 
 ## What Happens During Setup?
 
 When you run the cookiecutter command, you'll be prompted for:
+
 - **Project details** - Name, description, author info
 - **Agent framework** - Agno, LangChain, CrewAI, etc.
 - **Features** - Authentication, DID, observability, CI/CD
 - **License type** - MIT, Apache, BSD, GPL, ISC
 
-Then boom! 💥 Your agent project is ready with:
+Then your agent project is ready with:
 
-```
+```text
 your-agent/
 ├── agent_config.json          # Agent configuration with A2A/AP2/X402 settings
 ├── your_agent/
@@ -138,148 +193,133 @@ your-agent/
 └── README.md                 # Complete setup instructions
 ```
 
-## Fire It Up
+Each piece has a job:
 
-Navigate to your agent directory:
-
-```bash
-cd your-agent
-```
-
-Install dependencies (this is fast with uv):
-
-```bash
-uv sync
-```
-
-Start your agent:
-
-```bash
-uv run python -m your_agent.main
-```
-
-**That's it.**
-
-Your agent is now live at `http://localhost:3773`.
-
-It's speaking:
-- **A2A** - Agent-to-Agent protocol
-- **AP2** - Agentic Protocol 2
-- **X402** - Payment rails
-
-Other agents can discover it.  
-Talk to it.  
-Pay it for services.
-
-You just joined the Internet of Agents.
-
----
+- `agent_config.json` holds the agent configuration with A2A, AP2, and X402 settings
+- `main.py` is the generated entry point where the agent is already Bindu-fied
+- `skills/` gives you the starting structure for agent skills
+- `tests/` comes pre-configured for pytest
+- `pyproject.toml` keeps dependencies managed by `uv`
+- `Dockerfile` makes containerization straightforward
+- `.github/workflows/` sets up CI/CD pipelines
+- `README.md` gives you the generated setup instructions
 
 ## What You Just Got
 
-All of this. Out of the box.  
-No configuration. No setup. No weeks of work.
+All of this comes out of the box. No extra setup phase. No separate infrastructure sprint.
 
 <CardGroup cols={2}>
   <Card title="Protocol Support" icon="network-wired">
-    Built-in A2A, AP2, and X402 protocol compliance
+    Built-in A2A, AP2, and X402 protocol compliance.
   </Card>
   <Card title="Authentication" icon="lock">
-    Secure authentication with Auth0 and DID support
+    Secure authentication with Auth0 and DID support.
   </Card>
   <Card title="Observability" icon="chart-line">
-    Phoenix, Langfuse, and Jaeger integration
+    Phoenix, Langfuse, and Jaeger integration.
   </Card>
   <Card title="CI/CD" icon="code-branch">
-    GitHub Actions workflows for testing and deployment
+    GitHub Actions workflows for testing and deployment.
   </Card>
   <Card title="Testing" icon="flask">
-    Pre-configured pytest with coverage reporting
+    Pre-configured pytest with coverage reporting.
   </Card>
   <Card title="Documentation" icon="book">
-    MkDocs setup for beautiful documentation
+    MkDocs setup for beautiful documentation.
   </Card>
   <Card title="Containerization" icon="docker">
-    Docker/Podman ready for easy deployment
+    Docker/Podman ready for easy deployment.
   </Card>
   <Card title="Code Quality" icon="check-circle">
-    Ruff, ty, and pre-commit hooks configured
+    Ruff, ty, and pre-commit hooks configured.
   </Card>
 </CardGroup>
 
 ## Learn More
 
-<CardGroup cols={2}>
-  <Card title="Configuration Reference" icon="gear" href="/bindu/create-bindu-agent/configuration">
-    Complete guide to all configuration options
-  </Card>
-  <Card title="Template Overview" icon="book" href="/bindu/create-bindu-agent/overview">
-    Learn more about create-bindu-agent
-  </Card>
-  <Card title="Key Concepts" icon="lightbulb" href="/bindu/introduction/key-concepts">
-    Understand Bindu's core concepts
-  </Card>
-  <Card title="Authentication" icon="shield" href="/bindu/learn/auth">
-    Configure authentication for your agent
-  </Card>
-  <Card title="DID Setup" icon="fingerprint" href="/bindu/learn/did">
-    Set up Decentralized Identifiers
-  </Card>
-  <Card title="Observability" icon="eye" href="/bindu/learn/observability/phoenix">
-    Monitor your agent with Phoenix or Langfuse
-  </Card>
-</CardGroup>
-
-## When Things Go Wrong
-
-They usually don't. But if they do:
-
 <AccordionGroup>
-  <Accordion title="uv not found">
-    You need uv installed first.
-    
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
-    
-    Then restart your terminal and try again.
+  <Accordion title="Configuration Reference">
+    Complete guide to all configuration options.
+
+    Path: [Configuration Reference](/bindu/create-bindu-agent/configuration)
   </Accordion>
-  
-  <Accordion title="Port already in use">
-    Something's already running on port 3773.
-    
-    Change the `deployment_port` in your `agent_config.json` to something else (like 3773 or 9000).
-    
-    Or kill whatever's using that port.
+
+  <Accordion title="Template Overview">
+    Learn more about create-bindu-agent.
+
+    Path: [Template Overview](/bindu/create-bindu-agent/overview)
   </Accordion>
-  
-  <Accordion title="Authentication errors">
-    You probably haven't set up Auth0 credentials yet.
-    
-    Check the generated README for details on environment variables.
-    
-    Or disable auth in your config if you're just testing.
+
+  <Accordion title="Key Concepts">
+    Understand Bindu's core concepts.
+
+    Path: [Key Concepts](/bindu/introduction/key-concepts)
   </Accordion>
-  
-  <Accordion title="Dependencies not installing">
-    Sometimes the virtual environment gets corrupted.
-    
-    Nuke it and start fresh:
-    ```bash
-    rm -rf .venv
-    uv sync
-    ```
-    
-    Should work now.
+
+  <Accordion title="Authentication">
+    Configure authentication for your agent.
+
+    Path: [Authentication](/bindu/learn/authentication)
+  </Accordion>
+
+  <Accordion title="DID Setup">
+    Set up Decentralized Identifiers.
+
+    Path: [DID Setup](/bindu/learn/did)
+  </Accordion>
+
+  <Accordion title="Observability">
+    Monitor your agent with Phoenix or Langfuse.
+
+    Path: [Observability](/bindu/learn/observability)
   </Accordion>
 </AccordionGroup>
 
+## When Things Go Wrong
+
+Most of the time the template path is smooth. When it is not, the failures are usually familiar ones.
+
+<CardGroup cols={2}>
+  <Card title="uv Not Found" icon="terminal">
+    Install `uv` first with `curl -LsSf https://astral.sh/uv/install.sh | sh`, then restart your terminal and try again.
+  </Card>
+  <Card title="Port Already In Use" icon="plug">
+    Something is already running on port `3773`. Change the `deployment_port` in `agent_config.json` to something else, or stop the process using that port.
+  </Card>
+  
+  {/* Changed to 'lock' for a universally understood authentication symbol */}
+  <Card title="Authentication Errors" icon="lock">
+    You probably have not set up Auth0 credentials yet. Check the generated README for environment variables, or disable auth in your config while testing.
+  </Card>
+  
+  {/* Changed to 'boxes-stacked' to represent package dependencies */}
+  <Card title="Dependencies Not Installing" icon="boxes-stacked">
+    Sometimes the virtual environment gets corrupted. Remove it, run `uv sync` again, and retry.
+  </Card>
+</CardGroup>
+
 ---
 
-## Still Stuck?
+## Related
 
-**Join our [Discord community](https://discord.gg/3w5zuYUuwt)** - Real people, real help, usually within minutes.
+- https://github.com/getbindu/Bindu/tree/main/examples
 
-Or check out the [GitHub repository](https://github.com/getbindu/create-bindu-agent) for more examples and documentation.
+---
 
-We're building this together. Your questions make the docs better.
+<span className="brand-quote">
+  <img
+    src="/logo/light.svg"
+    alt="Sunflower Logo"
+    width="32"
+    className="clean-icon"
+  />
+
+  <span className="brand-quote-text">
+    Bindu helps you get from{" "}
+    <span className="brand-quote-highlight">
+      agent idea to live agent
+    </span>
+    , without spending the next three weeks buried in infrastructure.
+  </span>
+</span>
+

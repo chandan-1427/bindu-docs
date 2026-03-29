@@ -211,17 +211,21 @@
       },
       {
         "tab": "Roadmap",
-        "pages": ["roadmap/introduction/overview"]
+        "groups": [
+          {
+            "group": "Roadmap",
+            "pages": [
+              "roadmap/introduction/overview"
+            ]
+          }
+        ]
       },
       {
         "tab": "Changelog",
         "groups": [
           {
-            "group": "Community & Updates",
+            "group": "Updates",
             "pages": [
-              "bindu/introduction/getting-help",
-              "roadmap/introduction/overview",
-              "faq/introduction/overview",
               "changelog/v2026.12.5",
               "changelog/v2026.9.4",
               "changelog/v2026.8.7",

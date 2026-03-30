@@ -2,28 +2,34 @@
 title: 'Deploy Your Agent'
 ---
 
-Complete guide to deploying your Bindu agent using Docker Compose, Makefile commands, and various deployment options.
+Complete guide to deploying your Bindu agent. We'll walk you through everything you need to get your agent running in production!
 
-## Prerequisites
+## What You'll Need
 
-Before deploying your agent, ensure you have:
+Before we start deploying your awesome agent, make sure you have these tools ready:
 
-- Docker and Docker Compose installed
-- Python 3.12+ (for local development)
-- [uv](https://docs.astral.sh/uv/) package manager installed
-- Your `.env` file configured with required API keys
+- 🐳 **Docker & Docker Compose** - For containerization and orchestration
+- 🐍 **Python 3.12+** - For local development and testing  
+- ⚡ **uv package manager** - Fast dependency management
+- 🔑 **API Keys** - Your `.env` file with all required credentials
 
-## Environment Setup
+<Tip>
+Don't have these yet? No worries! We'll guide you through each setup step.
+</Tip>
 
-### 1. Configure Environment Variables
+## Setting Up Your Environment
 
-Copy the example environment file and add your API keys:
+Let's get your environment configured for success!
+
+### Configure Your API Keys
+
+First, copy the example environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and add your credentials:
+Now, open `.env` and add your secret API keys:
 
 ```bash
 # OpenRouter API Configuration
@@ -32,139 +38,133 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 # Get your API key from: https://openrouter.ai/keys
 ```
 
-<Note>
-Never commit your `.env` file to version control. It's already included in `.gitignore`.
-</Note>
+<Warning>
+ **Security First!** Never commit your `.env` file to version control. It's already included in `.gitignore` to keep your secrets safe.
+</Warning>
 
-## Docker Compose Deployment
+## 🐳 Docker Deployment Made Easy
 
-Your agent comes with a complete Docker Compose setup that includes:
-- **Main Agent Service** - Your Bindu agent
-- **Jaeger** - Distributed tracing and monitoring
-- **Phoenix** - LLM observability and debugging
+Ready to deploy? Your agent comes with a complete Docker Compose setup that handles everything:
 
-### Docker Compose Configuration
+- 🚀 **Main Agent Service** - Your awesome Bindu agent with health checks and monitoring
+- ⚙️ **Smart Environment Support** - Storage, scheduler, telemetry, and more
+- 🌐 **Production-Ready Networking** - Isolated networks and proper port mapping
 
-The `docker-compose.yml` file defines three services:
+### Your Docker Compose Configuration
+
+Here's what your `docker-compose.yml` file looks like (using placeholders for your project):
 
 ```yaml
 services:
-  my_bindu_agent:
+  {{project_name}}:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: my_bindu_agent
+      dockerfile: Dockerfile.agent
+    container_name: {{project_name}}
     ports:
       - "3773:3773"
     environment:
+      # OpenRouter API Configuration
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://phoenix:4317
+
+      # Mem0 Memory Configuration
+      - MEM0_API_KEY=${MEM0_API_KEY}
+
+      # Database Configuration
+      - STORAGE_TYPE=${STORAGE_TYPE:-memory}
+      - DATABASE_URL=${DATABASE_URL}
+
+      # Redis Scheduler Configuration
+      - SCHEDULER_TYPE=${SCHEDULER_TYPE:-memory}
+      - REDIS_URL=${REDIS_URL}
+
+      # Sentry Error Tracking
+      - SENTRY_ENABLED=${SENTRY_ENABLED:-false}
+      - SENTRY_DSN=${SENTRY_DSN}
+
+      # Telemetry & Observability
+      - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
+      - OLTP_VERBOSE_LOGGING=${OLTP_VERBOSE_LOGGING:-false}
+      - OLTP_ENDPOINT=${OLTP_ENDPOINT}
+      - OLTP_SERVICE_NAME=${OLTP_SERVICE_NAME:-{{project_name}}}
+      - OLTP_HEADERS=${OLTP_HEADERS}
     env_file:
       - .env
-    volumes:
-      - ./my_bindu_agent:/app/my_bindu_agent
-      - ./agent_config.json:/app/agent_config.json
     restart: unless-stopped
     networks:
-      - my_bindu_agent-network
-    depends_on:
-      - jaeger
-      - phoenix
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: my_bindu_agent-jaeger
-    ports:
-      - "16686:16686"  # Jaeger UI
-      - "4318:4318"    # OTLP HTTP receiver
-      - "4317:4317"    # OTLP gRPC receiver
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    networks:
-      - my_bindu_agent-network
-    restart: unless-stopped
-
-  phoenix:
-    image: arizephoenix/phoenix:latest
-    container_name: my_bindu_agent-phoenix
-    ports:
-      - "6006:6006"  # Phoenix UI and OTLP HTTP collector
-      - "4319:4317"  # OTLP gRPC collector
-    environment:
-      - PHOENIX_WORKING_DIR=/mnt/data
-    volumes:
-      - phoenix_data:/mnt/data
-    networks:
-      - my_bindu_agent-network
-    restart: unless-stopped
+      - {{project_name}}-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3773/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
-  my_bindu_agent-network:
+  {{project_name}}-network:
     driver: bridge
-
-volumes:
-  phoenix_data:
-    driver: local
 ```
 
-### Docker Compose Commands
+### 🎮 Docker Commands You'll Use
+
+Ready to get your agent running? Here are the essential commands:
 
 <Steps>
-  <Step title="Build and Start Services">
-    Build the Docker images and start all services:
+  <Step title="🚀 Build & Start">
+    Fire up your agent with all services:
 
     ```bash
     docker-compose up --build
     ```
 
-    Or run in detached mode (background):
+    Want it running in the background? Use detached mode:
 
     ```bash
     docker-compose up -d --build
     ```
   </Step>
 
-  <Step title="View Logs">
+  <Step title="📋 View Logs">
+    Keep an eye on what's happening:
+
     View logs from all services:
 
     ```bash
     docker-compose logs -f
     ```
 
-    View logs from a specific service:
+    Focus on your specific service:
 
     ```bash
-    docker-compose logs -f my_bindu_agent
-    docker-compose logs -f jaeger
-    docker-compose logs -f phoenix
+    docker-compose logs -f {{project_name}}
     ```
   </Step>
 
-  <Step title="Stop Services">
-    Stop all running services:
+  <Step title="🛑 Stop Services">
+    Time to shut things down:
 
     ```bash
     docker-compose down
     ```
 
-    Stop and remove volumes (clears all data):
+    Want to clear everything (including data)?
 
     ```bash
     docker-compose down -v
     ```
   </Step>
 
-  <Step title="Restart Services">
-    Restart all services:
+  <Step title="🔄 Quick Restart">
+    Need to restart your agent?
 
     ```bash
     docker-compose restart
     ```
 
-    Restart a specific service:
+    Restart just your agent:
 
     ```bash
-    docker-compose restart my_bindu_agent
+    docker-compose restart {{project_name}}
     ```
   </Step>
 </Steps>
@@ -284,38 +284,67 @@ Your agent includes a Makefile with common development tasks. Use `make help` to
 
 ## Dockerfile Overview
 
-The Dockerfile uses a multi-stage approach optimized for Python 3.12 and `uv`:
+The Dockerfile uses a modern multi-stage approach optimized for Python 3.12 and `uv`:
 
 ```dockerfile
-# Install uv
-FROM python:3.12-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+# Dockerfile.agent
+# Multi-stage build for a Bindu agent ({{project_name}} example).
+# Builder: python:3.12-bookworm + uv
+# Runtime: bindu-runtime-base
 
-# Change the working directory to the `app` directory
+# ---------- Builder stage ----------
+FROM python:3.12-bookworm AS builder
+
+# Install uv once in builder (no need in runtime)
+RUN pip install --no-cache-dir uv
+
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 WORKDIR /app
 
-# Copy the lockfile and `pyproject.toml` into the image
-COPY uv.lock /app/uv.lock
-COPY pyproject.toml /app/pyproject.toml
+# 1) Install dependencies into .venv (lockfile + pyproject)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev
 
-# Install dependencies
-RUN uv sync --frozen --no-install-project
+# 2) Copy agent code
+COPY {{project_name}}/ /app/{{project_name}}/
+COPY *.py /app/
+COPY README.md /app/
 
-# Copy the project into the image
-COPY . /app
+# 3) Install project itself into the same venv
+RUN uv sync --frozen --no-dev
 
-# Sync the project
-RUN uv sync --frozen
+# ---------- Runtime stage ----------
+FROM raahulrahl/bindu-runtime-base:latest
 
-CMD ["uv", "run", "python", "-m", "my_bindu_agent.main"]
+# OCI labels
+LABEL org.opencontainers.image.title="{{project_name}}-agent"
+LABEL org.opencontainers.image.description="A Bindu AI agent for intelligent task handling"
+LABEL org.opencontainers.image.authors="{{author}} <{{email}}>"
+LABEL org.opencontainers.image.version="{{agent_version}}"
+LABEL org.opencontainers.image.source="https://github.com/{{author_github_handle}}/{{project_name}}"
+LABEL org.opencontainers.image.licenses="{{open_source_license}}"
+
+# Copy app + venv from builder
+COPY --from=builder /app /app
+
+# Use the agent venv Python by default
+ENV PATH="/app/.venv/bin:$PATH"
+
+WORKDIR /app
+EXPOSE 3773
+
+CMD ["python", "-m", "{{project_name}}"]
 ```
 
 ### Key Features
 
-- **Slim Base Image** - Uses `python:3.12-slim` for minimal size
-- **UV Package Manager** - Fast dependency resolution and installation
+- **Multi-Stage Build** - Separates build and runtime environments for optimal size and security
+- **Bindu Runtime Base** - Uses `raahulrahl/bindu-runtime-base:latest` for production-ready runtime
+- **UV Package Manager** - Fast dependency resolution and installation with bytecode compilation
 - **Frozen Dependencies** - Ensures reproducible builds with `--frozen` flag
-- **Layer Caching** - Dependencies installed before code copy for faster rebuilds
+- **OCI Labels** - Complete container metadata for better container management
+- **Optimized Layers** - Dependencies installed before code copy for faster rebuilds
+- **Production Ready** - Health checks, proper networking, and environment configuration
 
 ## Deployment Workflows
 
@@ -342,7 +371,7 @@ CMD ["uv", "run", "python", "-m", "my_bindu_agent.main"]
 
   <Step title="Start Agent Locally">
     ```bash
-    uv run python -m my_bindu_agent.main
+    uv run python -m {{project_name}}.main
     ```
   </Step>
 </Steps>
@@ -365,7 +394,7 @@ CMD ["uv", "run", "python", "-m", "my_bindu_agent.main"]
 
   <Step title="Monitor Logs">
     ```bash
-    docker-compose logs -f my_bindu_agent
+    docker-compose logs -f {{project_name}}
     ```
   </Step>
 
@@ -379,19 +408,19 @@ CMD ["uv", "run", "python", "-m", "my_bindu_agent.main"]
 <Steps>
   <Step title="Build Production Image">
     ```bash
-    docker build -t my-bindu-agent:latest .
+    docker build -t {{project_name}}:latest .
     ```
   </Step>
 
   <Step title="Tag for Registry">
     ```bash
-    docker tag my-bindu-agent:latest your-registry/my-bindu-agent:latest
+    docker tag {{project_name}}:latest your-registry/{{project_name}}:latest
     ```
   </Step>
 
   <Step title="Push to Registry">
     ```bash
-    docker push your-registry/my-bindu-agent:latest
+    docker push your-registry/{{project_name}}:latest
     ```
   </Step>
 
@@ -464,7 +493,7 @@ Phoenix uses the [OpenInference](https://github.com/Arize-ai/openinference) stan
     Check agent logs for errors:
 
     ```bash
-    docker-compose logs -f my_bindu_agent
+    docker-compose logs -f {{project_name}}
     ```
 
     Verify the agent is healthy:

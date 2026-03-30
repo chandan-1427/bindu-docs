@@ -2,12 +2,14 @@
 title: 'Configuration'
 ---
 
-Complete guide to all configuration options available when creating a Bindu agent with cookiecutter. Follow these steps in order to configure your agent.
+Complete guide to creating your Bindu agent. We'll walk you through every step of the setup process - just answer the questions and you'll have a production-ready AI agent in minutes!
 
 <Steps>
   <Step title="Basic Information" icon="user">
 
 ## Basic Information
+
+Let's start with the basics - tell us about yourself and your agent!
 
 <ParamField path="author" type="string" default="Your Name">
   Your name or organization name
@@ -18,23 +20,15 @@ Complete guide to all configuration options available when creating a Bindu agen
 </ParamField>
 
 <ParamField path="author_github_handle" type="string" default="your_github_handle">
-  Your GitHub username, this will be used for the github actions.
+  Your GitHub username (we'll use this for GitHub Actions)
 </ParamField>
 
 <ParamField path="project_name" type="string" default="my-bindu-agent">
-  The name of your agent project (will be used for directory name).
+  What should we call your agent project? (this becomes the folder name)
 </ParamField>
 
 <ParamField path="project_description" type="string" default="A Bindu AI agent for intelligent task handling">
-  Brief description of what your agent does
-</ParamField>
-
-<ParamField path="agent_version" type="string" default="1.0.0">
-  Initial version number for your agent.
-</ParamField>
-
-<ParamField path="bindu_version" type="string" default="0.3.19">
-  Version of Bindu to use
+  Briefly describe what your agent does
 </ParamField>
 
   </Step>
@@ -43,15 +37,17 @@ Complete guide to all configuration options available when creating a Bindu agen
 
 ## Agent Framework
 
+Pick your favorite AI framework - we'll handle all the Bindu integration for you!
+
 <ParamField path="agent_framework" type="select" default="agno">
   Choose your preferred agent framework:
-  - **agno** - Lightweight and fast
-  - **langchain** - Full-featured with extensive integrations
-  - **crew** - Multi-agent orchestration
-  - **fastagent** - High-performance agents
-  - **openai agent** - OpenAI's native agent framework
-  - **google adk agent** - Google's Agent Development Kit
-  - **custom** - Bring your own framework
+  - **agno** - Lightweight and super fast ⚡
+  - **langchain** - Full-featured with tons of integrations 🦜
+  - **crew** - Perfect for multi-agent teams 👥
+  - **fastagent** - High-performance when speed matters 🚀
+  - **openai agent** - Native OpenAI integration 🤖
+  - **google adk agent** - Google's Agent Development Kit 🔍
+  - **custom** - Bring your own framework 🛠️
 </ParamField>
 
   </Step>
@@ -60,12 +56,40 @@ Complete guide to all configuration options available when creating a Bindu agen
 
 ## Skills & Capabilities
 
-<ParamField path="include_example_skills" type="select" default="y">
-  We do encourage you to include example skills to get started quickly.
-  Because the skills will be used later to advertise the power of the agents to the world.
-  Include example skills to get started quickly
-  - **y** - Include example skills
-  - **n** - Start with a blank slate
+Want to give your agent some special powers? Choose a pre-built skill or start from scratch!
+
+<ParamField path="primary_skill" type="select" default="none">
+  Choose a primary skill for your agent (optional):
+  - **none** - Start fresh and build your own skills 🎯
+  - **finance** - Financial analysis and planning 💰
+  - **financial-coach** - Personal finance coaching 💸
+  - **competitor-analysis** - Market and competitor research 📊
+  - **startup-analyst** - Startup evaluation and analysis 🚀
+  - **explainable-business-reasoning** - Business logic explanation 🧠
+  - **deep-research** - In-depth research capabilities 🔬
+  - **analyze-paper** - Academic paper analysis 📚
+  - **hackernews-analysis** - Hacker News trend analysis 📰
+  - **media-trend-analysis** - Media and trend monitoring 📺
+  - **instagram-post** - Social media content creation 📸
+  - **meme-generator** - Fun meme and content generation 😄
+  - **screenplay-writer** - Creative writing assistance 🎬
+  - **recipe-creator** - Recipe generation and cooking 👨‍🍳
+  - **youtube** - YouTube content optimization 🎥
+  - **web-extraction** - Web data extraction 🌐
+  - **travel-planner** - Travel itinerary planning ✈️
+  - **surprise-travel-planning** - Spontaneous trip suggestions 🎲
+  - **shopping-partner** - Smart shopping assistance 🛍️
+  - **movie-recommender** - Personalized movie recommendations 🎬
+  - **personalized-book-recommendation** - Book suggestions 📖
+  - **breakup-recovery** - Emotional support and healing 💚
+  - **cbt-clinical-critic** - Cognitive behavioral therapy critique 🧠
+  - **cbt-drafter** - CBT content drafting ✍️
+  - **cbt-safety-guardian** - Safety monitoring 🛡️
+  - **cbt-supervisor-orchestrator** - CBT supervision 👨‍⚕️
+  - **system-architect-advisor** - System architecture guidance 🏗️
+  - **biomni** - Biological data analysis 🧬
+  - **legal-consultant** - Legal advice and consultation ⚖️
+  - **zk-policy** - Zero-knowledge policy analysis 🔐
 </ParamField>
 
 <ParamField path="skill_names" type="string" default="question-answering,pdf-processing">
@@ -79,193 +103,100 @@ Complete guide to all configuration options available when creating a Bindu agen
 
 ## Authentication & Security
 
-<ParamField path="enable_auth" type="select" default="y">
-  Enable authentication for your agent
-  - **y** - Enable authentication
-  - **n** - No authentication (not recommended for production)
-</ParamField>
+Lock down your agent with secure access controls (optional for development):
 
-<ParamField path="auth_provider" type="select" default="auth0">
-  Choose authentication provider:
-  - **auth0** - Auth0 authentication
-  - **cognito** (not implemented yet)
-  - **azure ad** (not implemented yet)
-  - **google** (not implemented yet)
-  - **custom** (not implemented yet)
-  - **none** - No authentication
+<ParamField path="enable_authentication" type="select" default="n">
+  Should we enable authentication?
+  - **n** - No authentication (easier for development) 🔓
+  - **y** - Enable authentication with Ory Hydra 🔐
 </ParamField>
 
   </Step>
 
   <Step title="Identity & Cryptography" icon="key">
 
-## Identity & Cryptography
-
-<ParamField path="enable_did" type="select" default="y">
-  Enable Decentralized Identifier (DID) for your agent
-  We would encourage you to enable DID for your agent. That will help to provide an identity to your agent.
-  We have not added decentralised identity support yet. But thats our roadmap.
-  - **y** - Enable DID
-  - **n** - Disable DID
-</ParamField>
-
-<ParamField path="enable_pki" type="select" default="y">
-  Enable Public Key Infrastructure
-  We would encourage you to enable PKI for your agent. That will create an internal folder for your agent's keys.
-  - **y** - Enable PKI
-  - **n** - Disable PKI
-</ParamField>
-
-<ParamField path="recreate_keys" type="select" default="y">
-  Recreate cryptographic keys on each deployment.
-  - **y** - Recreate keys
-  - **n** - Reuse existing keys
-</ParamField>
-
-<ParamField path="verification_key_type" type="select" default="rsa">
-  Type of verification key:
-  - **rsa** - RSA encryption
-  - **ecdsa** - Elliptic Curve Digital Signature Algorithm
-</ParamField>
-
-  </Step>
-
-  <Step title="Agent Behavior" icon="sliders">
-
-## Agent Behavior
-
-<ParamField path="enable_system_message" type="select" default="y">
-  Enable system message for agent instructions. When enabled, a system message is added to your agent's prompts to ensure it follows the "input-required" protocol correctly.
-  - **y** - Enable system message
-  - **n** - Disable system message
-</ParamField>
-
-<ParamField path="enable_context_based_history" type="select" default="n">
-  Enable context-based conversation history. When enabled, the agent maintains context across tasks, which may improve performance but could also increase hallucination risk. Monitor your agent's output carefully if you enable this feature.
-  - **y** - Enable context-based history
-  - **n** - Use simple history
-</ParamField>
-
-  </Step>
-
-  <Step title="Observability & Monitoring" icon="eye">
-
 ## Observability & Monitoring
 
-<ParamField path="enable_telemetry" type="select" default="y">
-  Enable telemetry for monitoring. When enabled, the agent sends telemetry data to the observability provider.
-  - **y** - Enable telemetry
-  - **n** - Disable telemetry
-</ParamField>
+Keep an eye on your agent's performance and behavior:
 
-<ParamField path="enable_llm_observability" type="select" default="y">
-  Enable LLM-specific observability. Uses [OpenInference](https://github.com/Arize-ai/openinference) to track LLM usage. This format is respected by many observability providers.
-  - **y** - Enable LLM observability
-  - **n** - Disable LLM observability
-</ParamField>
-
-<ParamField path="llm_observability_provider" type="select" default="phoenix">
-  Choose LLM observability provider:
-  - **phoenix** - Arize Phoenix
-  - **langfuse** - Langfuse (not properly tested yet)
-</ParamField>
-
-<ParamField path="use_jaeger" type="select" default="y">
-  Enable Jaeger for distributed tracing
-  - **y** - Enable Jaeger
-  - **n** - Disable Jaeger
+<ParamField path="observability_provider" type="select" default="none">
+  How should we monitor your agent?
+  - **none** - No monitoring (keep it simple) 🔍
+  - **phoenix** - LLM observability 🦜
+  - **jaeger** - Distributed tracing 🔬
+  - **langfuse** - LLM analytics 📊
 </ParamField>
 
   </Step>
 
   <Step title="Cost Tracking" icon="dollar">
 
-<ParamField path="enable_execution_cost" type="select" default="n">
-  Track execution costs and enable payment requirements. When enabled, clients must pay for each request. A configuration will be created with settings like amount ($0.0001), token (USDC), network (base-sepolia), payment address, and protected methods. The payment flow respects the X402 protocol. For more details, see the payment documentation.
-  - **y** - Enable cost tracking
-  - **n** - Disable cost tracking
+## Paywall
+
+Want to monetize your agent? Enable micropayments for your services:
+
+<ParamField path="enable_paywall" type="select" default="n">
+  Should we add a paywall?
+  - **n** - Free access to your agent 🆓
+  - **y** - Charge for services using X402 protocol 💰
 </ParamField>
 
   </Step>
 
-  <Step title="Storage & Scheduling" icon="database">
+  <Step title="Storage" icon="database">
 
-## Storage & Scheduling
+## Storage
+
+Where should your agent remember things?
 
 <ParamField path="storage_type" type="select" default="memory">
-  Choose storage backend. All workers use shared storage to track tasks and persist data. For production, use PostgreSQL because in-memory storage loses all information if the pod goes down.
-  - **memory** - In-memory storage
-  - **postgres** (not implemented yet)
+  Pick your storage backend:
+  - **memory** - Fast but temporary (lost on restart) ⚡
+  - **postgres** - Persistent and production-ready 💾
 </ParamField>
+
+  </Step>
+
+  <Step title="Security Features" icon="shield">
+
+## Security Features
+
+Choose how your agent handles identity and security:
+
+<ParamField path="security_features" type="select" default="did-and-pki">
+  Pick your security setup:
+  - **did-and-pki** - Full identity + encryption 🔐🔑
+  - **did-only** - Identity verification only 🆔
+  - **pki-only** - Encryption only 🔑
+  - **none** - No security features (not recommended) ⚠️
+</ParamField>
+
+  </Step>
+
+  <Step title="Scheduler" icon="clock">
+
+## Scheduler
+
+How should your agent handle background tasks and scheduled jobs?
 
 <ParamField path="scheduler_type" type="select" default="memory">
-  Choose scheduler backend. For production, use Redis.
-  - **memory** - In-memory scheduler
-  - **redis** (not implemented yet)
+  Choose your task scheduler:
+  - **memory** - Simple and in-process 🧠
+  - **redis** - Distributed and scalable 🔄
 </ParamField>
 
   </Step>
 
-  <Step title="Deployment" icon="rocket">
+  <Step title="GitHub Actions" icon="github">
 
-## Deployment
+## GitHub Actions
 
-<ParamField path="deployment_host" type="string" default="0.0.0.0">
-  Host address for deployment
-</ParamField>
+Want automated CI/CD workflows for testing and deployment?
 
-<ParamField path="deployment_port" type="string" default="3773">
-  Port number for deployment, Lets use 3773 as default, two prime numbers 37+73 :)
-</ParamField>
-
-<ParamField path="log_level" type="select" default="info">
-  Logging level:
-  - **info** - Standard information
-  - **debug** - Detailed debugging
-  - **warning** - Warnings only
-  - **error** - Errors only
-</ParamField>
-
-  </Step>
-
-  <Step title="Development Tools" icon="wrench">
-
-## Development Tools
-
-<ParamField path="type_checker" type="select" default="ty">
-  Choose type checker:
-  - **ty** - Astral's type checker
-  - **none** - No type checking
-</ParamField>
-
-<ParamField path="include_github_actions" type="select" default="y">
-  Include GitHub Actions CI/CD workflows
-  - **y** - Include workflows
-  - **n** - Skip workflows
-</ParamField>
-
-<ParamField path="mkdocs" type="select" default="y">
-  Include MkDocs documentation setup
-  - **y** - Include MkDocs
-  - **n** - Skip documentation
-</ParamField>
-
-<ParamField path="codecov" type="select" default="y">
-  Include Codecov integration
-  - **y** - Include Codecov
-  - **n** - Skip Codecov
-</ParamField>
-
-<ParamField path="devcontainer" type="select" default="n">
-  Include VS Code devcontainer configuration
-  - **y** - Include devcontainer
-  - **n** - Skip devcontainer
-</ParamField>
-
-<ParamField path="dockerfile" type="select" default="y">
-  Include Dockerfile for containerization
-  - **y** - Include Dockerfile
-  - **n** - Skip Dockerfile
+<ParamField path="include_github_actions" type="select" default="Yes">
+  Should we include GitHub Actions?
+  - **Yes** - Include automated workflows 🤖
+  - **No** - Skip workflows 🔧
 </ParamField>
 
   </Step>
@@ -274,14 +205,16 @@ Complete guide to all configuration options available when creating a Bindu agen
 
 ## License
 
-<ParamField path="open_source_license" type="select" default="MIT license">
-  Choose open source license:
-  - **MIT license**
-  - **Apache Software License 2.0**
-  - **BSD license**
-  - **ISC license**
-  - **GNU General Public License v3**
-  - **Not open source**
+What open source license should your agent use?
+
+<ParamField path="open_source_license" type="select" default="Apache Software License 2.0">
+  Choose your license:
+  - **Apache Software License 2.0** - Popular, permissive license 📄
+  - **MIT license** - Simple and permissive 🎯
+  - **BSD license** - Berkeley Software Distribution 🏛️
+  - **ISC license** - Minimal restrictions 📝
+  - **GNU General Public License v3** - Copyleft license ⚖️
+  - **Not open source** - Proprietary code 🔒
 </ParamField>
 
   </Step>
